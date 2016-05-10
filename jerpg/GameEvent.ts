@@ -20,7 +20,7 @@ class GameEvent implements IGameEvent {
     update(game: GameEngine) {
         this.count++;
         if (this.count >= this.duration)
-            game.removeState(this);
+            game.removeEvent(this);
     }
 }
 
