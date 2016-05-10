@@ -1,23 +1,25 @@
-interface GameEvent {
+interface IGameEvent {
+    invoke(game: Game) : void;
+    update(game: Game) : void;
+    render?(ctx: CanvasRenderingContext2D) : void;
+}
+
+class GameEvent implements IGameEvent {
+    id: number;
+    remove: boolean;
+    
     constructor() {
-        
-    }
-    
-    invoke(game) {
-        
-    }
-    
-    update(game) {
-    
-    }
-    
-    render(ctx) {
-    
+        this.id = Math.floor(Math.random() * 1000000);
+        this.remove = false;
     }
 }
 
-class SleepEvent implements GameEvent {
-    constructor(duration) {
+class SleepEvent extends GameEvent {
+    duration: double;
+    count: number;
+
+    constructor(duration:number = 1000) {
+        super();
         this.duration = duration;
         this.count = 0;
     }
@@ -33,9 +35,9 @@ class SleepEvent implements GameEvent {
     }
 }
 
-class SpriteEvent implements GameEvent {
+class SpriteEvent extends GameEvent {
     constructor() {
-        
+        super();
     }
     
     invoke(game) {
@@ -51,9 +53,9 @@ class SpriteEvent implements GameEvent {
     }
 }
 
-class TextEvent implements GameEvent {
+class TextEvent extends GameEvent {
     constructor() {
-        
+        super();
     }
     
     invoke(game) {
@@ -69,9 +71,9 @@ class TextEvent implements GameEvent {
     }
 }
 
-class ChangeMapEvent implements GameEvent {
+class ChangeMapEvent extends GameEvent {
     constructor() {
-        
+        super();
     }
     
     invoke(game) {
@@ -87,8 +89,15 @@ class ChangeMapEvent implements GameEvent {
     }
 }
 
-class FadeEvent implements GameEvent {
-    constructor(effect, color="black", outspeed=0.1, inspeed=0.1) {
+class FadeEvent extends GameEvent {
+    effect: string;
+    color: string;
+    outspeed: number;
+    inspeed: number;
+    layer: GameLayer;
+
+    constructor(effect:string="fade", color:string="black", outspeed:number=0.1, inspeed:number=0.1) {
+        super();
         this.effect = effect;
         this.outspeed = outspeed;
         this.inspeed = inspeed;
@@ -109,11 +118,11 @@ class FadeEvent implements GameEvent {
             this.layer.alpha += this.inspeed;
             
         if (this.effect == "fadeout" && this.alpha <= 0)
-            game.gotoNextEvent();
+            this.remove = true;
       
         if (this.effect == "fadein" && this.alpha >= 1) {
             game.removeLayer(this.layer);
-            game.gotoNextEvent();
+            this.remove = true;
         }
     }
 }
