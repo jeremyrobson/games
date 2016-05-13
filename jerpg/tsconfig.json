@@ -1,0 +1,18 @@
+{
+    "compileOnSave": true,
+    "compilerOptions": {
+        "target": "es5",
+        "declaration": false,
+        "noImplicitAny": false,
+        "removeComments": true,
+        "noLib": false,
+        "outFile": "game.js"
+    },
+    "files": [
+        "./Color.ts",
+        "./GameObject.ts",
+        "./GameLayer.ts",
+        "./GameEvent.ts",
+        "./GameEngine.ts"
+    ]
+}

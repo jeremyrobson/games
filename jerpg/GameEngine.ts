@@ -1,59 +1,56 @@
 /// <reference path="definitions.d.ts"/>
 
 class GameEngine {
+    window: Window;
+    canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
-    state: string;
-    layers: Array<GameLayer>;
-    events: Array<GameEvent>;
-    
-    constructor() {
-        this.state = "none";
-        this.layers = new Array<GameLayer>();
-        this.events = new Array<GameEvent>();
+    timerID: number;
+    scene: GameScene;
+    //lasttick: number;
+
+    constructor(window: Window, canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
+        this.window = window;
+        this.canvas = canvas;
+        this.ctx = context;
+        
+        let scene = new GameScene();
+        
+        let layer = new GameLayer(this.canvas.width, this.canvas.height);
+        layer.setColor(new Color(0,0,0,1));
+        
+        let obj = new GameObject(20, 20, 50, 50, new Color(255,0,0,1));
+        layer.addObject(obj);
+        scene.addLayer(layer);
+        
+        let event = new TranslateObjectEvent(obj, 200, 200).setInterval(10).setSpeed(10);
+        scene.addEvent(event);
+        
+        let event2 = new TranslateObjectEvent(obj, 400, 0).setInterval(10).setSpeed(1);
+        event.setNextEvent(event2);
+        
+        this.setScene(scene);
     }
 
-    setState(state: string) {
-        this.state = state;
+    start() {
+        //this.lasttick = performance.now();
+        this.update();
+        console.log("Engine started with timerID " + this.timerID);
     }
     
-    addEvent(event: GameEvent) {
-        event.invoke(this);
-        this.events.push(event);
-    }
-    
-    addLayer(layer: GameLayer) {
-        this.layers.push(layer);
-    }
-    
-    removeLayer(a: GameLayer) {
-        this.layers = this.layers.filter(
-            (b) => return a.id != b.id;
-        );
-    }
-    
-    removeEvent(event: GameEvent) {
-        if (event.next)
-            this.addEvent(event.next);
-    
-        this.events = this.events.filter(
-            (b) => return a.id != b.id;
-        );
+    setScene(scene: GameScene) {
+        this.scene = scene;
     }
     
     update() {
-        this.events.forEach(
-            (event) => event.update(this);
-        );
-    
-        this.layers.forEach(
-            (layer) => layer.update(this);
-        );
+        this.scene.update(this);
+        
+        this.render();
+        //this.lasttick = performance.now();
+        this.timerID = this.window.requestAnimationFrame(() => this.update());
     }
     
     render() {
-        this.layers.forEach(
-            (layer) => layer.render(this.ctx);
-        );
+        this.scene.render(this.ctx);
     }
     
 }

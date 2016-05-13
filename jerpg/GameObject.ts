@@ -1,16 +1,14 @@
 /// <reference path="definitions.d.ts"/>
 
 class GameObject {
-    id:number;
+    id:string;
     x:number; y:number; width:number; height:number;
     color: Color;
     alpha: number;
     fillStyle: string;
-    width: number;
-    height: number;
     
     constructor(x:number,y:number,width:number,height:number,color:Color) {
-        this.id = Math.floor(Math.random() * 1000000);
+        this.id = Math.floor(Math.random() * 1000000).toString();
         this.x = x;
         this.y = y;
         this.width = width;
@@ -24,7 +22,7 @@ class GameObject {
         this.fillStyle = color.toString();
     }
 
-    update(game: GameEngine) {
+    update(scene: GameScene) {
         
     }
     

@@ -15,22 +15,22 @@ class GameLayer extends GameObject {
     
     removeObject(obj: GameObject) {
         this.objects = this.objects.filter(
-            (b) => return a.id != b.id;
+            (a: GameObject) => { return obj.id != a.id }
         );
     }
     
-    update(game: GameEngine) {
+    update(scene: GameScene) {
         this.objects.forEach(
-            (obj) => obj.update();
+            (obj: GameObject) => { obj.update(scene) }
         );
     }
     
     render(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = this.color.fillStyle;
-        ctx.fillRect()
+        ctx.fillRect(0, 0, this.width, this.height);
         
         this.objects.forEach(
-            (obj) => obj.render(this);
+            (obj: GameObject) => { obj.render(ctx, this) }
         );
     }
     
