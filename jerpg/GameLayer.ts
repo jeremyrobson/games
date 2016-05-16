@@ -1,22 +1,25 @@
 /// <reference path="definitions.d.ts"/>
 
+//todo: layers exist on seperate canvases? 
+
 class GameLayer extends GameObject {
     objects: Array<GameObject>;
     
-    constructor(width: number = 640, height: number = 480) {
-        super(0, 0, width, height, new Color(255,255,255,1));
+    constructor(x: number = 0, y: number = 0, width: number = 640, height: number = 480) {
+        super(0, 0, width, height);
 
         this.objects = new Array<GameObject>();
     }
 
-    addObject(obj: GameObject) {
-        this.objects.push(obj);
+    addObject(obj: GameObject): number {
+        return this.objects.push(obj);
     }
     
-    removeObject(obj: GameObject) {
+    removeObject(obj: GameObject): number {
         this.objects = this.objects.filter(
             (a: GameObject) => { return obj.id != a.id }
         );
+        return this.objects.length;
     }
     
     update(scene: GameScene) {
@@ -25,12 +28,11 @@ class GameLayer extends GameObject {
         );
     }
     
-    render(ctx: CanvasRenderingContext2D) {
-        ctx.fillStyle = this.color.fillStyle;
-        ctx.fillRect(0, 0, this.width, this.height);
+    render(ctx: CanvasRenderingContext2D, offsetX: number = 0, offsetY: number = 0) {
+        super.render(ctx);
         
         this.objects.forEach(
-            (obj: GameObject) => { obj.render(ctx, this) }
+            (obj: GameObject) => { obj.render(ctx, this.x, this.y) }
         );
     }
     

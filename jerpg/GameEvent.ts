@@ -3,11 +3,13 @@
 interface IGameEvent {
     invoke?(scene: GameScene) : void;
     update?(scene: GameScene) : void;
-    render?(ctx: CanvasRenderingContext2D) : void;
+    //render?(ctx: CanvasRenderingContext2D) : void;
+    done?(ctx: GameScene) : void;
 }
 
 class GameEvent implements IGameEvent {
     id: number;
+    enabled: boolean;
     lasttick: number;
     interval: number;
     duration: number;
@@ -16,6 +18,24 @@ class GameEvent implements IGameEvent {
     
     constructor() {
         this.id = Math.floor(Math.random() * 1000000);
+        this.setEnabled(true);
+        this.setDuration(Infinity);
+        this.count = 0;
+    }
+    
+    setEnabled(value: boolean) {
+        this.enabled = value;
+        return this;
+    }
+    
+    setDuration(value: number) {
+        this.duration = value;
+        return this;
+    }
+    
+    setInterval(value: number) {
+        this.interval = value;
+        return this;
     }
     
     setNextEvent(next: GameEvent) {
@@ -52,24 +72,24 @@ class TranslateObjectEvent extends GameEvent {
     speed: number;
     angle: number;
     
-    constructor(obj: GameObject, x:number, y:number) {
+    constructor(obj: GameObject) {
         super();
         this.object = obj;
         this.startX = obj.x;
         this.startY = obj.y;
-        this.targetX = x;
-        this.targetY = y;
-        this.speed = 1;
-        this.interval = 1;
+        this.setTarget(this.startX, this.startY);
+        this.setSpeed(1);
+        this.setInterval(1);
     }
     
-    setInterval(interval: number) {
-        this.interval = interval;
+    setTarget(x: number, y: number) {
+        this.targetX = x;
+        this.targetY = y;
         return this;
     }
     
-    setSpeed(speed: number) {
-        this.speed = speed;
+    setSpeed(value: number) {
+        this.speed = value;
         return this;
     }
     
@@ -79,21 +99,19 @@ class TranslateObjectEvent extends GameEvent {
     }
     
     update(scene: GameScene) {
+        super.update(scene);
+        
+        //todo: update angle to allow "chasing"?
         if (performance.now() > this.lasttick + this.interval) {
-            this.object.x += Math.cos(this.angle) * this.speed;
-            this.object.y += Math.sin(this.angle) * this.speed;
+            this.object.move(Math.cos(this.angle) * this.speed, Math.sin(this.angle) * this.speed);
             
-            let distance = getDistance(this.object.x, this.object.y, this.targetX, this.targetY);
-            if (distance < 25)
+            let distance: number = getDistance(this.object.x, this.object.y, this.targetX, this.targetY);
+            if (distance <= this.speed)
                 scene.removeEvent(this);
             
             this.lasttick = performance.now();
         }
         
-    }
-    
-    render(ctx: CanvasRenderingContext2D) {
-    
     }
 }
 
@@ -111,11 +129,7 @@ class DialogEvent extends GameEvent {
     }
     
     update(scene: GameScene) {
-    
-    }
-    
-    render(ctx: CanvasRenderingContext2D) {
-    
+        super.update(scene);
     }
 }
 
@@ -129,11 +143,7 @@ class ChangeMapEvent extends GameEvent {
     }
     
     update(scene: GameScene) {
-    
-    }
-    
-    render(ctx: CanvasRenderingContext2D) {
-    
+        super.update(scene);
     }
 }
 
@@ -144,34 +154,34 @@ class FadeEvent extends GameEvent {
     inspeed: number;
     layer: GameLayer;
 
-    constructor() {
+    constructor(effect: string) {
         super();
-        this.effect = "fadeout";
-        this.outspeed = 0.1;
-        this.inspeed = 0.1;
-        this.layer = new GameLayer(); //todo, layer canvases on page
-        this.layer.color = new Color(255, 0, 0, 1.0);
-        this.layer.alpha = 1.0;
-    }
-    
-    setEffect(effect:string) {
         this.effect = effect;
-        return this;
+        this.outspeed = 0.01;
+        this.inspeed = 0.01;
+        this.layer = new GameLayer()
+            .setColor(new Color(0, 0, 0, 1))
+            .setAlpha((effect == "fadeout") ? 1.0 : 0.0);
     }
     
-    setColor(color:Color) {
+    setColor(color: Color) {
         this.color = color;
         return this;
     }
     
-    setOutspeed(outspeed:number) {
-        this.outspeed = outspeed;
+    setOutspeed(value: number) {
+        this.outspeed = value;
         return this;   
     }
     
-    setInspeed(inspeed:number) {
-        this.inspeed = inspeed;
+    setInspeed(value: number) {
+        this.inspeed = value;
         return this;
+    }
+    
+    done(scene: GameScene) {
+        scene.removeLayer(this.layer);
+        scene.removeEvent(this);
     }
     
     invoke(scene: GameScene) {
@@ -180,17 +190,17 @@ class FadeEvent extends GameEvent {
     }
     
     update(scene: GameScene) {
+        super.update(scene);
+        
         if (this.effect == "fadeout" && this.layer.alpha > 0)
-            this.layer.alpha -= this.outspeed;
+            this.layer.setAlpha(this.layer.alpha - this.outspeed);
         else if (this.effect == "fadein" && this.layer.alpha < 1)
-            this.layer.alpha += this.inspeed;
+            this.layer.setAlpha(this.layer.alpha + this.inspeed);
             
         if (this.effect == "fadeout" && this.layer.alpha <= 0)
-            scene.removeEvent(this);
+            this.done(scene);
       
-        if (this.effect == "fadein" && this.layer.alpha >= 1) {
-            scene.removeLayer(this.layer);
-            scene.removeEvent(this);
-        }
+        if (this.effect == "fadein" && this.layer.alpha >= 1)
+            this.done(scene);
     }
 }

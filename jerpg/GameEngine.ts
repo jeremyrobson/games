@@ -15,18 +15,13 @@ class GameEngine {
         
         let scene = new GameScene();
         
-        let layer = new GameLayer(this.canvas.width, this.canvas.height);
+        let layer = new GameLayer(0, 0, this.canvas.width, this.canvas.height);
         layer.setColor(new Color(0,0,0,1));
         
-        let obj = new GameObject(20, 20, 50, 50, new Color(255,0,0,1));
-        layer.addObject(obj);
+        let d = new GameDialog(["hello", "how are you?", "I am fineeeee"], 20, 20, 50, 50);
+
+        layer.addObject(d);
         scene.addLayer(layer);
-        
-        let event = new TranslateObjectEvent(obj, 200, 200).setInterval(10).setSpeed(10);
-        scene.addEvent(event);
-        
-        let event2 = new TranslateObjectEvent(obj, 400, 0).setInterval(10).setSpeed(1);
-        event.setNextEvent(event2);
         
         this.setScene(scene);
     }

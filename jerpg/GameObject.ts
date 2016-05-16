@@ -1,42 +1,86 @@
 /// <reference path="definitions.d.ts"/>
 
+//todo: implements Drawable, Sortable
+//remember, dialogs go on top layer
+
 class GameObject {
     id:string;
     x:number; y:number; width:number; height:number;
     color: Color;
     alpha: number;
-    fillStyle: string;
+    font: string;
+    textColor: Color;
+    draggable: boolean;
     
-    constructor(x:number,y:number,width:number,height:number,color:Color) {
+    constructor(x: number, y: number, width: number, height: number) {
         this.id = Math.floor(Math.random() * 1000000).toString();
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
-        this.setColor(color);
+        this.setColor(new Color(255,0,0,1));
+        this.setTextColor(new Color(255,255,0,1));
+        this.setFont("24px Arial");
     }
     
-    setColor(color: Color) {
+    setColor(color: Color): any {
         this.color = color;
         this.alpha = color.a;
-        this.fillStyle = color.toString();
+        return this;
+    }
+    
+    setAlpha(alpha: number): any {
+        if (alpha < 0) alpha = 0;
+        this.alpha = alpha;
+        this.color.a = alpha;
+        return this;
+    }
+
+    setTextColor(color: Color): any {
+        this.textColor = color;
+        return this;
+    }
+
+    setFont(font: string): any {
+        this.font = font;
+        return this;
+    }
+
+    hit(mx: number, my: number): boolean {
+        return mx >= this.x && my >= this.y
+        && mx < this.width && my < this.height;
+    }
+
+    move(dx: number, dy: number): any {
+        this.x += dx;
+        this.y += dy;
+        return this;
     }
 
     update(scene: GameScene) {
         
     }
     
-    render(ctx: CanvasRenderingContext2D, parent: GameLayer) {
-        let drawX = this.x + parent.x;
-        let drawY = this.y + parent.y;
+    drawRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+        ctx.fillStyle = this.color.fillStyle;
+        ctx.fillRect(x, y, this.width, this.height);
+
+    }
     
-        ctx.fillStyle = this.fillStyle;
-        ctx.fillRect(drawX, drawY, this.width, this.height);
-        
-        ctx.fillStyle = "rgb(255,255,0)";
-        ctx.font = "24px Arial";
+    drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
+        ctx.fillStyle = this.textColor.fillStyle;
+        ctx.font = this.font;
         ctx.textBaseline = "top";
-        ctx.fillText(this.id, drawX, drawY);
+        ctx.fillText(text, x, y);
+    }
+    
+    render(ctx: CanvasRenderingContext2D, offsetX: number = 0, offsetY: number = 0) {
+        let drawX = this.x + offsetX;
+        let drawY = this.y + offsetY;
+        this.drawRect(ctx, drawX, drawY, this.width, this.height);
+        this.drawText(ctx, this.id, drawX, drawY);
+    
+
     }
     
 }

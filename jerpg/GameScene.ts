@@ -18,6 +18,15 @@ class GameScene {
     addEvent(event: GameEvent) {
         event.invoke(this);
         this.events.push(event);
+        return event;
+    }
+
+    loopEvents(...events: GameEvent[]) {
+        for (let i = 0; i < events.length - 1; i++)
+            events[i].setNextEvent(events[i + 1]);
+        
+        events[events.length - 1].setNextEvent(events[0]);
+        this.addEvent(events[0]);
     }
 
     addLayer(layer: GameLayer) {
@@ -31,7 +40,7 @@ class GameScene {
     }
     
     removeEvent(event: GameEvent) {
-        if (event.next)
+        if (event.enabled && event.next)
             this.addEvent(event.next);
     
         this.events = this.events.filter(
