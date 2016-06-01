@@ -115,24 +115,6 @@ class TranslateObjectEvent extends GameEvent {
     }
 }
 
-class DialogEvent extends GameEvent {
-    textArray: Array<string>;
-    textIndex: number;
-    currentPos: number;
-    
-    constructor() {
-        super();
-    }
-    
-    invoke(scene: GameScene) {
-        
-    }
-    
-    update(scene: GameScene) {
-        super.update(scene);
-    }
-}
-
 class ChangeMapEvent extends GameEvent {
     constructor() {
         super();
@@ -149,26 +131,29 @@ class ChangeMapEvent extends GameEvent {
 
 class FadeEvent extends GameEvent {
     effect: string;
-    color: Color;
     outspeed: number;
     inspeed: number;
     layer: GameLayer;
+    object: any;
 
-    constructor(effect: string) {
+    //todo: calculate inspeed/outspeed from duration
+    constructor(effect: string, object: any, duration: number) {
         super();
         this.effect = effect;
         this.outspeed = 0.01;
         this.inspeed = 0.01;
-        this.layer = new GameLayer()
-            .setColor(new Color(0, 0, 0, 1))
-            .setAlpha((effect == "fadeout") ? 1.0 : 0.0);
+        this.object = object;
+            //.setColor(new Color(0, 0, 0, 1))
+            //.setAlpha((effect == "fadeout") ? 1.0 : 0.0)
     }
     
+    /*
     setColor(color: Color) {
         this.color = color;
         return this;
     }
-    
+    */
+
     setOutspeed(value: number) {
         this.outspeed = value;
         return this;   
@@ -179,28 +164,55 @@ class FadeEvent extends GameEvent {
         return this;
     }
     
-    done(scene: GameScene) {
-        scene.removeLayer(this.layer);
+    done(scene: GameScene) {    
         scene.removeEvent(this);
     }
     
     invoke(scene: GameScene) {
-        //scene.setState("fadeout");
-        scene.addLayer(this.layer);
     }
     
     update(scene: GameScene) {
         super.update(scene);
         
         if (this.effect == "fadeout" && this.layer.alpha > 0)
-            this.layer.setAlpha(this.layer.alpha - this.outspeed);
+            this.object.setAlpha(this.object.alpha - this.outspeed);
         else if (this.effect == "fadein" && this.layer.alpha < 1)
-            this.layer.setAlpha(this.layer.alpha + this.inspeed);
+            this.object.setAlpha(this.object.alpha + this.inspeed);
             
-        if (this.effect == "fadeout" && this.layer.alpha <= 0)
+        if (this.effect == "fadeout" && this.object.alpha <= 0)
             this.done(scene);
       
-        if (this.effect == "fadein" && this.layer.alpha >= 1)
+        if (this.effect == "fadein" && this.object.alpha >= 1)
             this.done(scene);
+    }
+}
+
+class DialogEvent extends GameEvent {
+    textQueue: Array<string>;
+    letters: Array<string>;
+    textBox: TextBox;
+    
+    constructor(textArray: Array<string>, textBox: TextBox) {
+        super();
+
+        this.textQueue = textArray;
+        this.textBox = textBox;
+    }
+
+    update(scene: GameScene) {
+        //super.update(scene);
+        if (this.letters) {
+            if (this.letters.length > 0) {
+                this.textBox.addLetter(this.letters.shift());
+            }
+            else {
+                this.letters = null;
+            }
+        }
+        else {
+            if (this.textQueue.length > 0) {
+                this.letters = this.textQueue.shift().split("");
+            }
+        }
     }
 }

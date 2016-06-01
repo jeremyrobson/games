@@ -6,6 +6,30 @@ function getDistance(x1, y1, x2, y2) {
 function getAngle(x1, y1, x2, y2) {
     return Math.atan2(y2 - y1, x2 - x1);
 }
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+class Rectangle extends GameObject {
+}
+class TextBox extends Rectangle {
+    constructor(x, y, width, height) {
+        super(x, y, width, height);
+        this.text = "";
+    }
+    addLetter(letter) {
+        this.text += letter;
+    }
+    setText(text) {
+        this.text = text;
+    }
+    render(ctx, offsetX, offsetY) {
+        super.render(ctx, offsetX, offsetY);
+        this.drawText(ctx, this.text, this.cursor.x, this.cursor.y);
+    }
+}
 class GameObject {
     constructor(x, y, width, height) {
         this.id = Math.floor(Math.random() * 1000000).toString();
@@ -98,38 +122,6 @@ class GameMenu extends GameLayer {
         super.render(ctx, offsetX, offsetY);
     }
 }
-class GameDialog extends GameMenu {
-    constructor(textArray, x, y, width, height) {
-        super(x, y, width, height);
-        this.textQueue = textArray;
-        this.textIndex = 0;
-        this.letterIndex = 0;
-        this.text = "";
-    }
-    update(scene) {
-        if (this.letters) {
-            let letter = this.letters[this.letterIndex];
-            if (letter) {
-                this.text += letter;
-                this.letterIndex++;
-            }
-            else {
-                this.textIndex++;
-                this.letters = null;
-            }
-        }
-        else {
-            if (this.textQueue[this.textIndex]) {
-                this.letters = this.textQueue[this.textIndex].split("");
-                this.letterIndex = 0;
-            }
-        }
-    }
-    render(ctx, offsetX, offsetY) {
-        super.render(ctx, offsetX, offsetY);
-        this.drawText(ctx, this.text, 100, 100);
-    }
-}
 class GameEvent {
     constructor() {
         this.id = Math.floor(Math.random() * 1000000);
@@ -202,16 +194,6 @@ class TranslateObjectEvent extends GameEvent {
         }
     }
 }
-class DialogEvent extends GameEvent {
-    constructor() {
-        super();
-    }
-    invoke(scene) {
-    }
-    update(scene) {
-        super.update(scene);
-    }
-}
 class ChangeMapEvent extends GameEvent {
     constructor() {
         super();
@@ -223,18 +205,12 @@ class ChangeMapEvent extends GameEvent {
     }
 }
 class FadeEvent extends GameEvent {
-    constructor(effect) {
+    constructor(effect, object, duration) {
         super();
         this.effect = effect;
         this.outspeed = 0.01;
         this.inspeed = 0.01;
-        this.layer = new GameLayer()
-            .setColor(new Color(0, 0, 0, 1))
-            .setAlpha((effect == "fadeout") ? 1.0 : 0.0);
-    }
-    setColor(color) {
-        this.color = color;
-        return this;
+        this.object = object;
     }
     setOutspeed(value) {
         this.outspeed = value;
@@ -245,22 +221,42 @@ class FadeEvent extends GameEvent {
         return this;
     }
     done(scene) {
-        scene.removeLayer(this.layer);
         scene.removeEvent(this);
     }
     invoke(scene) {
-        scene.addLayer(this.layer);
     }
     update(scene) {
         super.update(scene);
         if (this.effect == "fadeout" && this.layer.alpha > 0)
-            this.layer.setAlpha(this.layer.alpha - this.outspeed);
+            this.object.setAlpha(this.object.alpha - this.outspeed);
         else if (this.effect == "fadein" && this.layer.alpha < 1)
-            this.layer.setAlpha(this.layer.alpha + this.inspeed);
-        if (this.effect == "fadeout" && this.layer.alpha <= 0)
+            this.object.setAlpha(this.object.alpha + this.inspeed);
+        if (this.effect == "fadeout" && this.object.alpha <= 0)
             this.done(scene);
-        if (this.effect == "fadein" && this.layer.alpha >= 1)
+        if (this.effect == "fadein" && this.object.alpha >= 1)
             this.done(scene);
+    }
+}
+class DialogEvent extends GameEvent {
+    constructor(textArray, textBox) {
+        super();
+        this.textQueue = textArray;
+        this.textBox = textBox;
+    }
+    update(scene) {
+        if (this.letters) {
+            if (this.letters.length > 0) {
+                this.textBox.addLetter(this.letters.shift());
+            }
+            else {
+                this.letters = null;
+            }
+        }
+        else {
+            if (this.textQueue.length > 0) {
+                this.letters = this.textQueue.shift().split("");
+            }
+        }
     }
 }
 class GameScene {
@@ -277,10 +273,13 @@ class GameScene {
         this.events.push(event);
         return event;
     }
-    loopEvents(...events) {
+    loopEvents(events) {
+        events[events.length - 1].setNextEvent(events[0]);
+        this.queueEvents(events);
+    }
+    queueEvents(events) {
         for (let i = 0; i < events.length - 1; i++)
             events[i].setNextEvent(events[i + 1]);
-        events[events.length - 1].setNextEvent(events[0]);
         this.addEvent(events[0]);
     }
     addLayer(layer) {
@@ -310,9 +309,16 @@ class GameEngine {
         let scene = new GameScene();
         let layer = new GameLayer(0, 0, this.canvas.width, this.canvas.height);
         layer.setColor(new Color(0, 0, 0, 1));
-        let d = new GameDialog(["hello", "how are you?", "I am fineeeee"], 20, 20, 50, 50);
-        layer.addObject(d);
+        let gd = new TextBox(20, 20, 50, 50);
+        gd.setColor(new Color(0, 255, 255, 1));
+        layer.addObject(gd);
         scene.addLayer(layer);
+        let fade = new FadeEvent("fadein", gd, 1000);
+        let arr = ["Hello", "How are you?"];
+        let te = new DialogEvent(arr, gd);
+        let me = new TranslateObjectEvent(gd).setTarget(200, 200).setSpeed(1);
+        let te2 = new DialogEvent(["I am fine."], gd);
+        scene.queueEvents([fade, te, me, te2]);
         this.setScene(scene);
     }
     start() {

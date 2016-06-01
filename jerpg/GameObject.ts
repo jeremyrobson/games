@@ -23,7 +23,7 @@ class GameObject {
         this.setFont("24px Arial");
     }
     
-    setColor(color: Color): any {
+    setColor(color: Color): this {
         this.color = color;
         this.alpha = color.a;
         return this;

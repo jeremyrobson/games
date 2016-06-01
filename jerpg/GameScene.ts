@@ -3,6 +3,7 @@
 class GameScene {
     layers: Array<GameLayer>;
     events: Array<GameEvent>;
+    queue: Array<GameEvent>;
     state: string;
     
     constructor() {
@@ -21,11 +22,14 @@ class GameScene {
         return event;
     }
 
-    loopEvents(...events: GameEvent[]) {
+    loopEvents(events: Array<GameEvent>) {
+        events[events.length - 1].setNextEvent(events[0]);
+        this.queueEvents(events);
+    }
+
+    queueEvents(events: Array<GameEvent>) {
         for (let i = 0; i < events.length - 1; i++)
             events[i].setNextEvent(events[i + 1]);
-        
-        events[events.length - 1].setNextEvent(events[0]);
         this.addEvent(events[0]);
     }
 
