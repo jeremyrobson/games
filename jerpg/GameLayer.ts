@@ -28,6 +28,36 @@ class GameLayer extends GameObject {
         );
     }
     
+    mouseMove(x: number, y: number) : this {
+        if (!this.hit(x, y)) return null;
+
+        this.objects.forEach(
+            (obj: GameObject) => { obj.mouseMove(x, y) }
+        );
+
+        return this;
+    }
+
+    mouseDown(x: number, y: number, button: number) : this {
+        if (!this.hit(x, y)) return null;
+
+        this.objects.forEach(
+            (obj: GameObject) => { obj.mouseDown(x, y, button) }
+        );
+
+        return this;
+    }
+
+    mouseUp(x: number, y: number, button: number) : this {
+        if (!this.hit(x, y)) return null;
+
+        this.objects.forEach(
+            (obj: GameObject) => { obj.mouseUp(x, y, button) }
+        );
+
+        return this;
+    }
+
     render(ctx: CanvasRenderingContext2D, offsetX: number = 0, offsetY: number = 0) {
         super.render(ctx);
         

@@ -12,24 +12,6 @@ class Point {
         this.y = y;
     }
 }
-class Rectangle extends GameObject {
-}
-class TextBox extends Rectangle {
-    constructor(x, y, width, height) {
-        super(x, y, width, height);
-        this.text = "";
-    }
-    addLetter(letter) {
-        this.text += letter;
-    }
-    setText(text) {
-        this.text = text;
-    }
-    render(ctx, offsetX, offsetY) {
-        super.render(ctx, offsetX, offsetY);
-        this.drawText(ctx, this.text, this.cursor.x, this.cursor.y);
-    }
-}
 class GameObject {
     constructor(x, y, width, height) {
         this.id = Math.floor(Math.random() * 1000000).toString();
@@ -72,6 +54,9 @@ class GameObject {
     }
     update(scene) {
     }
+    mouseMove(x, y) { return this; }
+    mouseDown(x, y, button) { return this; }
+    mouseUp(x, y, button) { return this; }
     drawRect(ctx, x, y, width, height) {
         ctx.fillStyle = this.color.fillStyle;
         ctx.fillRect(x, y, this.width, this.height);
@@ -86,7 +71,56 @@ class GameObject {
         let drawX = this.x + offsetX;
         let drawY = this.y + offsetY;
         this.drawRect(ctx, drawX, drawY, this.width, this.height);
-        this.drawText(ctx, this.id, drawX, drawY);
+    }
+}
+class Rectangle extends GameObject {
+    constructor(x, y, width, height) {
+        super(x, y, width, height);
+        this.setColor(new Color(50, 100, 150, 1));
+        this.setTextColor(new Color(230, 230, 230, 1));
+        this.setFont("16px Arial");
+    }
+}
+class TextBox extends Rectangle {
+    constructor(x, y, width, height) {
+        super(x, y, width, height);
+        this.lines = [];
+        this.fontSize = 24;
+        this.text = "";
+        this.lineOffset = 0;
+    }
+    newLine(letter) {
+        if (letter === "\n" || letter === " ") {
+            this.lines.push("");
+            this.lineLength = 0;
+        }
+        else {
+            this.lines.push(letter);
+            this.lineLength = 1;
+        }
+        if (this.lines.length * this.fontSize > this.height)
+            this.lineOffset++;
+    }
+    addLetter(letter, word) {
+        this.text += letter;
+        if (this.lines.length === 0 ||
+            this.lines.length > 0 && letter === "\n") {
+            this.newLine(letter);
+            return;
+        }
+        let currentLine = this.lines.length - 1;
+        if (letter === " ")
+            this.lineLength = this.lines[currentLine].length;
+        if (word.length + this.lineLength > 40)
+            this.newLine(letter);
+        else
+            this.lines[currentLine] += letter;
+    }
+    render(ctx, offsetX, offsetY) {
+        super.render(ctx, offsetX, offsetY);
+        this.lines.forEach((line, i) => {
+            this.drawText(ctx, line, this.x, this.y + (i - this.lineOffset) * this.fontSize);
+        });
     }
 }
 class GameLayer extends GameObject {
@@ -104,6 +138,24 @@ class GameLayer extends GameObject {
     update(scene) {
         this.objects.forEach((obj) => { obj.update(scene); });
     }
+    mouseMove(x, y) {
+        if (!this.hit(x, y))
+            return null;
+        this.objects.forEach((obj) => { obj.mouseMove(x, y); });
+        return this;
+    }
+    mouseDown(x, y, button) {
+        if (!this.hit(x, y))
+            return null;
+        this.objects.forEach((obj) => { obj.mouseDown(x, y, button); });
+        return this;
+    }
+    mouseUp(x, y, button) {
+        if (!this.hit(x, y))
+            return null;
+        this.objects.forEach((obj) => { obj.mouseUp(x, y, button); });
+        return this;
+    }
     render(ctx, offsetX = 0, offsetY = 0) {
         super.render(ctx);
         this.objects.forEach((obj) => { obj.render(ctx, this.x, this.y); });
@@ -115,6 +167,23 @@ class GameMenu extends GameLayer {
         this.setColor(new Color(0, 0, 255, 1));
         this.setTextColor(new Color(255, 255, 255, 1));
         this.setFont("20px Arial");
+    }
+    mouseMove(x, y) {
+        if (!this.hit(x, y))
+            return null;
+        this.objects.forEach((obj) => { obj.mouseMove(x, y); });
+        return this;
+    }
+    mouseDown(x, y, button) {
+        if (!this.hit(x, y))
+            return null;
+        console.log("menu mouse down", x, y, button);
+        return this;
+    }
+    mouseUp(x, y, button) {
+        if (!this.hit(x, y))
+            return null;
+        return this;
     }
     update(scene) {
     }
@@ -128,6 +197,7 @@ class GameEvent {
         this.setEnabled(true);
         this.setDuration(Infinity);
         this.count = 0;
+        this.isDone = false;
     }
     setEnabled(value) {
         this.enabled = value;
@@ -227,9 +297,9 @@ class FadeEvent extends GameEvent {
     }
     update(scene) {
         super.update(scene);
-        if (this.effect == "fadeout" && this.layer.alpha > 0)
+        if (this.effect == "fadeout" && this.object.alpha > 0)
             this.object.setAlpha(this.object.alpha - this.outspeed);
-        else if (this.effect == "fadein" && this.layer.alpha < 1)
+        else if (this.effect == "fadein" && this.object.alpha < 1)
             this.object.setAlpha(this.object.alpha + this.inspeed);
         if (this.effect == "fadeout" && this.object.alpha <= 0)
             this.done(scene);
@@ -237,24 +307,73 @@ class FadeEvent extends GameEvent {
             this.done(scene);
     }
 }
+class AddObjectsEvent extends GameEvent {
+    constructor(layer, delay, ...arr) {
+        super();
+        this.delay = delay;
+        this.arr = arr;
+        this.layer = layer;
+    }
+    update(scene) {
+        super.update(scene);
+        if (this.arr.length > 0)
+            this.layer.addObject(this.arr.shift());
+        else
+            scene.removeEvent(this);
+    }
+}
+class OpenMenuEvent extends GameEvent {
+    constructor(menu) {
+        super();
+        this.menu = menu;
+        this.targetHeight = menu.height;
+        this.menu.y = this.menu.y + this.menu.height / 2;
+        this.menu.height = 0;
+    }
+    update(scene) {
+        super.update(scene);
+        if (this.menu.height < this.targetHeight) {
+            this.menu.height += 2;
+            this.menu.y -= 1;
+        }
+        else
+            scene.removeEvent(this);
+    }
+}
 class DialogEvent extends GameEvent {
     constructor(textArray, textBox) {
         super();
-        this.textQueue = textArray;
+        this.paragraphs = textArray;
         this.textBox = textBox;
+        this.letters = [];
+        this.words = [];
     }
     update(scene) {
-        if (this.letters) {
-            if (this.letters.length > 0) {
-                this.textBox.addLetter(this.letters.shift());
+        super.update(scene);
+        if (this.pause > 0)
+            return --this.pause;
+        if (this.letters.length > 0) {
+            let letter = this.letters.shift();
+            if (letter === "@") {
+                let d = parseInt(this.letters.shift()) || 0;
+                this.pause = d * 10;
             }
-            else {
-                this.letters = null;
-            }
+            else
+                this.textBox.addLetter(letter, this.currentWord);
+        }
+        else if (this.words.length > 0) {
+            this.currentWord = this.words.shift();
+            this.letters = this.currentWord.split("");
+            this.textBox.addLetter(" ", " ");
         }
         else {
-            if (this.textQueue.length > 0) {
-                this.letters = this.textQueue.shift().split("");
+            if (this.paragraphs.length > 0) {
+                this.words = this.paragraphs.shift().split(" ");
+                this.currentWord = this.words.shift();
+                this.letters = this.currentWord.split("");
+            }
+            else {
+                scene.removeEvent(this);
             }
         }
     }
@@ -269,6 +388,7 @@ class GameScene {
         this.state = state;
     }
     addEvent(event) {
+        console.log("invoking event", event);
         event.invoke(this);
         this.events.push(event);
         return event;
@@ -297,6 +417,18 @@ class GameScene {
         this.events.forEach((event) => { event.update(this); });
         this.layers.forEach((layer) => { layer.update(this); });
     }
+    mouseMove(x, y) {
+        this.layers.forEach((layer) => { layer.mouseMove(x, y); });
+        return this;
+    }
+    mouseDown(x, y, button) {
+        this.layers.forEach((layer) => { layer.mouseDown(x, y, button); });
+        return this;
+    }
+    mouseUp(x, y, button) {
+        this.layers.forEach((layer) => { layer.mouseUp(x, y, button); });
+        return this;
+    }
     render(ctx) {
         this.layers.forEach((layer) => { layer.render(ctx); });
     }
@@ -306,24 +438,34 @@ class GameEngine {
         this.window = window;
         this.canvas = canvas;
         this.ctx = context;
+        this.canvas.onmousemove = this.mouseMove.bind(this);
+        this.canvas.onmousedown = this.mouseDown.bind(this);
+        this.canvas.onmouseup = this.mouseUp.bind(this);
         let scene = new GameScene();
         let layer = new GameLayer(0, 0, this.canvas.width, this.canvas.height);
         layer.setColor(new Color(0, 0, 0, 1));
-        let gd = new TextBox(20, 20, 50, 50);
-        gd.setColor(new Color(0, 255, 255, 1));
-        layer.addObject(gd);
+        let tb = new TextBox(20, 20, 240, 120);
+        layer.addObject(tb);
         scene.addLayer(layer);
-        let fade = new FadeEvent("fadein", gd, 1000);
-        let arr = ["Hello", "How are you?"];
-        let te = new DialogEvent(arr, gd);
-        let me = new TranslateObjectEvent(gd).setTarget(200, 200).setSpeed(1);
-        let te2 = new DialogEvent(["I am fine."], gd);
-        scene.queueEvents([fade, te, me, te2]);
+        let fade = new FadeEvent("fadein", tb, 1000);
+        let arr = [
+            "Hello@5\n",
+            "How are you?@5\n",
+            "I am really hoping that this text will wrap within the set parameters.@5\n",
+            "It's@5 just@5 that@5 I can't believe this works.@9"
+        ];
+        let de = new DialogEvent(arr, tb);
+        let toe = new TranslateObjectEvent(tb).setTarget(200, 200).setSpeed(1);
+        let de2 = new DialogEvent(["\n\n\nI@3 @3a@3m@3 @3f@3i@3n@3e@3.@3"], tb);
+        let menu = new GameMenu(100, 100, 200, 100);
+        let aoe = new AddObjectsEvent(layer, 1, menu);
+        let ome = new OpenMenuEvent(menu);
+        scene.queueEvents([fade, de, toe, de2, aoe, ome]);
         this.setScene(scene);
     }
     start() {
-        this.update();
         console.log("Engine started with timerID " + this.timerID);
+        this.update();
     }
     setScene(scene) {
         this.scene = scene;
@@ -332,6 +474,22 @@ class GameEngine {
         this.scene.update(this);
         this.render();
         this.timerID = this.window.requestAnimationFrame(() => this.update());
+    }
+    setMouseCoords(e) {
+        this.mouseX = (e.layerX) ? e.layerX : e.offsetX;
+        this.mouseY = (e.layerY) ? e.layerY : e.offsetY;
+    }
+    mouseMove(e) {
+        this.setMouseCoords(e);
+        this.scene.mouseMove(this.mouseX, this.mouseY);
+    }
+    mouseDown(e) {
+        this.setMouseCoords(e);
+        this.scene.mouseDown(this.mouseX, this.mouseY, e.button);
+    }
+    mouseUp(e) {
+        this.setMouseCoords(e);
+        this.scene.mouseUp(this.mouseX, this.mouseY, e.button);
     }
     render() {
         this.scene.render(this.ctx);

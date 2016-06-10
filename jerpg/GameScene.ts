@@ -1,11 +1,13 @@
 /// <reference path="definitions.d.ts"/>
 
-class GameScene {
+class GameScene implements MouseListener {
     layers: Array<GameLayer>;
     events: Array<GameEvent>;
     queue: Array<GameEvent>;
     state: string;
-    
+    mouseX: number;
+    mouseY: number;
+
     constructor() {
         this.layers = new Array<GameLayer>();
         this.events = new Array<GameEvent>();
@@ -17,6 +19,7 @@ class GameScene {
     }
 
     addEvent(event: GameEvent) {
+        console.log("invoking event", event);
         event.invoke(this);
         this.events.push(event);
         return event;
@@ -62,6 +65,30 @@ class GameScene {
         );
     }
     
+    mouseMove(x: number, y: number) : this {
+        this.layers.forEach(
+            (layer: GameLayer) => { layer.mouseMove(x, y) }
+        );
+
+        return this;
+    }
+
+    mouseDown(x: number, y: number, button: number) : this {
+        this.layers.forEach(
+            (layer: GameLayer) => { layer.mouseDown(x, y, button) }
+        );
+
+        return this;
+    }
+
+    mouseUp(x: number, y: number, button: number) : this {
+        this.layers.forEach(
+            (layer: GameLayer) => { layer.mouseUp(x, y, button) }
+        );
+
+        return this;
+    }
+
     render(ctx: CanvasRenderingContext2D) {
         this.layers.forEach(
             (layer: GameLayer) => { layer.render(ctx) }

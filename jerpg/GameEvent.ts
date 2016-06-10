@@ -13,14 +13,17 @@ class GameEvent implements IGameEvent {
     lasttick: number;
     interval: number;
     duration: number;
+    pause: number;
     count: number;
     next: GameEvent;
+    isDone: boolean;
     
     constructor() {
         this.id = Math.floor(Math.random() * 1000000);
         this.setEnabled(true);
         this.setDuration(Infinity);
         this.count = 0;
+        this.isDone = false;
     }
     
     setEnabled(value: boolean) {
@@ -174,9 +177,9 @@ class FadeEvent extends GameEvent {
     update(scene: GameScene) {
         super.update(scene);
         
-        if (this.effect == "fadeout" && this.layer.alpha > 0)
+        if (this.effect == "fadeout" && this.object.alpha > 0)
             this.object.setAlpha(this.object.alpha - this.outspeed);
-        else if (this.effect == "fadein" && this.layer.alpha < 1)
+        else if (this.effect == "fadein" && this.object.alpha < 1)
             this.object.setAlpha(this.object.alpha + this.inspeed);
             
         if (this.effect == "fadeout" && this.object.alpha <= 0)
@@ -187,31 +190,100 @@ class FadeEvent extends GameEvent {
     }
 }
 
-class DialogEvent extends GameEvent {
-    textQueue: Array<string>;
-    letters: Array<string>;
-    textBox: TextBox;
-    
-    constructor(textArray: Array<string>, textBox: TextBox) {
+class AddObjectsEvent extends GameEvent {
+    arr: Array<GameObject>;
+    delay: number;
+    layer: GameLayer;
+
+    constructor(layer: GameLayer, delay: number, ...arr: Array<GameObject>) {
         super();
 
-        this.textQueue = textArray;
-        this.textBox = textBox;
+        this.delay = delay;
+        this.arr = arr;
+        this.layer = layer;
     }
 
     update(scene: GameScene) {
-        //super.update(scene);
-        if (this.letters) {
-            if (this.letters.length > 0) {
-                this.textBox.addLetter(this.letters.shift());
+        super.update(scene);
+
+        if (this.arr.length > 0)
+            this.layer.addObject(this.arr.shift());
+        else
+            scene.removeEvent(this);
+    }
+}
+
+class OpenMenuEvent extends GameEvent {
+    menu: GameMenu;
+    targetHeight: number;
+
+    constructor(menu: GameMenu) {
+        super();
+
+        this.menu = menu;
+        this.targetHeight = menu.height;
+        this.menu.y = this.menu.y + this.menu.height / 2;
+        this.menu.height = 0;
+    }
+
+    update(scene: GameScene) {
+        super.update(scene);
+
+        if (this.menu.height < this.targetHeight) {
+            this.menu.height += 2;
+            this.menu.y -= 1;
+        }
+        else
+            scene.removeEvent(this);
+    }
+}
+
+class DialogEvent extends GameEvent {
+    paragraphs: Array<string>;
+    words: Array<string>;
+    letters: Array<string>;
+    currentWord: string;
+    textBox: TextBox;
+    textSpeed: number; //not yet implemented
+
+    constructor(textArray: Array<string>, textBox: TextBox) {
+        super();
+
+        this.paragraphs = textArray;
+        this.textBox = textBox;
+        this.letters = [];
+        this.words = [];
+    }
+
+    update(scene: GameScene) {
+        super.update(scene);
+        
+        if (this.pause > 0)
+            return --this.pause;
+
+        if (this.letters.length > 0) {
+            let letter = this.letters.shift();
+            if (letter === "@") {
+                let d = parseInt(this.letters.shift()) || 0;
+                this.pause = d * 10;
             }
-            else {
-                this.letters = null;
-            }
+            else
+                this.textBox.addLetter(letter, this.currentWord);
+        }
+        else if (this.words.length > 0) {
+            this.currentWord = this.words.shift();
+            this.letters = this.currentWord.split("");
+            this.textBox.addLetter(" ", " ");
         }
         else {
-            if (this.textQueue.length > 0) {
-                this.letters = this.textQueue.shift().split("");
+            if (this.paragraphs.length > 0) {
+                this.words = this.paragraphs.shift().split(" ");
+                this.currentWord = this.words.shift();
+                this.letters = this.currentWord.split("");
+                //this.pause = 50;
+            }
+            else {
+                scene.removeEvent(this);
             }
         }
     }

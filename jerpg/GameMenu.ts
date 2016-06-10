@@ -10,6 +10,31 @@ class GameMenu extends GameLayer {
         this.setFont("20px Arial");
     }
     
+    mouseMove(x: number, y: number) : this {
+        if (!this.hit(x, y)) return null;
+
+        this.objects.forEach(
+           (obj: GameObject) => { obj.mouseMove(x, y) }
+        );
+
+        return this;
+    }
+
+    mouseDown(x: number, y: number, button: number) : this {
+        if (!this.hit(x, y)) return null;
+
+        console.log("menu mouse down", x, y, button);
+
+        return this;
+    }
+
+    mouseUp(x: number, y: number, button: number) : this {
+        if (!this.hit(x, y)) return null;
+
+
+        return this;
+    }
+
     update(scene: GameScene) {
         
     }

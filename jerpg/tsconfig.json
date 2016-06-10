@@ -9,10 +9,17 @@
         "outFile": "game.js"
     },
     "files": [
+        "./MouseListener.ts",
+        "./Functions.ts",
         "./Color.ts",
+        "./Point.ts",
         "./GameObject.ts",
+        "./Rectangle.ts",
+        "./TextBox.ts",
         "./GameLayer.ts",
+        "./GameMenu.ts",
         "./GameEvent.ts",
+        "./GameScene.ts",
         "./GameEngine.ts"
     ]
 }
