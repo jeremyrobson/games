@@ -73,17 +73,17 @@ class GameScene implements MouseListener {
         return this;
     }
 
-    mouseDown(x: number, y: number, button: number) : this {
+    mouseDown(x: number, y: number) : this {
         this.layers.forEach(
-            (layer: GameLayer) => { layer.mouseDown(x, y, button) }
+            (layer: GameLayer) => { layer.mouseDown(x, y) }
         );
 
         return this;
     }
 
-    mouseUp(x: number, y: number, button: number) : this {
+    mouseUp(x: number, y: number) : this {
         this.layers.forEach(
-            (layer: GameLayer) => { layer.mouseUp(x, y, button) }
+            (layer: GameLayer) => { layer.mouseUp(x, y) }
         );
 
         return this;

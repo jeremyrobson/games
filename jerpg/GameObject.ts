@@ -14,6 +14,8 @@ class GameObject implements MouseListener {
     borderSize: number;
     borderColor: Color;
     shadow: boolean;
+    shadowColor: Color;
+    shadowBlur: number;
     draggable: boolean;
     mouseX: number;
     mouseY: number;
@@ -27,6 +29,14 @@ class GameObject implements MouseListener {
         this.setColor(new Color(255,0,0,1));
         this.setTextColor(new Color(255,255,0,1));
         this.setFont("24px Arial");
+        this.border = false;
+        this.borderSize = 2;
+        this.borderColor = new Color(0,255,0,1);
+        this.shadow = false;
+        this.shadowColor = new Color(0,0,0,1);
+        this.shadowBlur = 0;
+
+        console.log(this.width, this.height);
     }
     
     setColor(color: Color): this {
@@ -54,7 +64,7 @@ class GameObject implements MouseListener {
 
     hit(mx: number, my: number): boolean {
         return mx >= this.x && my >= this.y
-        && mx < this.width && my < this.height;
+        && mx < this.x + this.width && my < this.y + this.height;
     }
 
     move(dx: number, dy: number): any {
@@ -67,14 +77,31 @@ class GameObject implements MouseListener {
         
     }
   
-    mouseMove(x: number, y: number) : this { return this; }
-    mouseDown(x: number, y: number, button: number) : this { return this;}
-    mouseUp(x: number, y: number, button: number) : this { return this; }
+    mouseMove(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this { return this; }
+    mouseDown(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this { return this; }
+    mouseUp(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this { return this; }
 
     drawRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+        ctx.beginPath();
         ctx.fillStyle = this.color.fillStyle;
-        ctx.fillRect(x, y, this.width, this.height);
+        ctx.rect(x, y, this.width, this.height);
 
+        if (this.shadow) {
+            ctx.shadowColor = this.shadowColor.fillStyle;
+            ctx.shadowBlur = this.shadowBlur;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        }
+        else
+            ctx.shadowColor = "transparent";
+
+        if (this.border) {
+            ctx.strokeStyle = this.borderColor.fillStyle;
+            ctx.lineWidth = this.borderSize;
+            ctx.stroke();
+        }
+
+        ctx.fill();
     }
     
     drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number) {
@@ -88,7 +115,6 @@ class GameObject implements MouseListener {
         let drawX = this.x + offsetX;
         let drawY = this.y + offsetY;
         this.drawRect(ctx, drawX, drawY, this.width, this.height);
-        //this.drawText(ctx, this.id, drawX, drawY);
     
 
     }

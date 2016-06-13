@@ -6,7 +6,7 @@ class GameLayer extends GameObject {
     objects: Array<GameObject>;
     
     constructor(x: number = 0, y: number = 0, width: number = 640, height: number = 480) {
-        super(0, 0, width, height);
+        super(x, y, width, height);
 
         this.objects = new Array<GameObject>();
     }
@@ -38,21 +38,21 @@ class GameLayer extends GameObject {
         return this;
     }
 
-    mouseDown(x: number, y: number, button: number) : this {
+    mouseDown(x: number, y: number) : this {
         if (!this.hit(x, y)) return null;
 
         this.objects.forEach(
-            (obj: GameObject) => { obj.mouseDown(x, y, button) }
+            (obj: GameObject) => { obj.mouseDown(x, y) }
         );
 
         return this;
     }
 
-    mouseUp(x: number, y: number, button: number) : this {
+    mouseUp(x: number, y: number) : this {
         if (!this.hit(x, y)) return null;
 
         this.objects.forEach(
-            (obj: GameObject) => { obj.mouseUp(x, y, button) }
+            (obj: GameObject) => { obj.mouseUp(x, y) }
         );
 
         return this;

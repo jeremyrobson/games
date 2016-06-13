@@ -22,6 +22,13 @@ class GameObject {
         this.setColor(new Color(255, 0, 0, 1));
         this.setTextColor(new Color(255, 255, 0, 1));
         this.setFont("24px Arial");
+        this.border = false;
+        this.borderSize = 2;
+        this.borderColor = new Color(0, 255, 0, 1);
+        this.shadow = false;
+        this.shadowColor = new Color(0, 0, 0, 1);
+        this.shadowBlur = 0;
+        console.log(this.width, this.height);
     }
     setColor(color) {
         this.color = color;
@@ -45,7 +52,7 @@ class GameObject {
     }
     hit(mx, my) {
         return mx >= this.x && my >= this.y
-            && mx < this.width && my < this.height;
+            && mx < this.x + this.width && my < this.y + this.height;
     }
     move(dx, dy) {
         this.x += dx;
@@ -54,12 +61,27 @@ class GameObject {
     }
     update(scene) {
     }
-    mouseMove(x, y) { return this; }
-    mouseDown(x, y, button) { return this; }
-    mouseUp(x, y, button) { return this; }
+    mouseMove(x, y, offsetX = 0, offsetY = 0) { return this; }
+    mouseDown(x, y, offsetX = 0, offsetY = 0) { return this; }
+    mouseUp(x, y, offsetX = 0, offsetY = 0) { return this; }
     drawRect(ctx, x, y, width, height) {
+        ctx.beginPath();
         ctx.fillStyle = this.color.fillStyle;
-        ctx.fillRect(x, y, this.width, this.height);
+        ctx.rect(x, y, this.width, this.height);
+        if (this.shadow) {
+            ctx.shadowColor = this.shadowColor.fillStyle;
+            ctx.shadowBlur = this.shadowBlur;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        }
+        else
+            ctx.shadowColor = "transparent";
+        if (this.border) {
+            ctx.strokeStyle = this.borderColor.fillStyle;
+            ctx.lineWidth = this.borderSize;
+            ctx.stroke();
+        }
+        ctx.fill();
     }
     drawText(ctx, text, x, y) {
         ctx.fillStyle = this.textColor.fillStyle;
@@ -81,6 +103,85 @@ class Rectangle extends GameObject {
         this.setFont("16px Arial");
     }
 }
+class GameControl extends GameObject {
+    constructor(x, y, width, height) {
+        super(x, y, width, height);
+        this.setColor(new Color(0, 0, 255, 1));
+        this.setTextColor(new Color(255, 255, 255, 1));
+        this.setFont("20px Arial");
+        this.mousePressed = false;
+    }
+    setFunction(fn) {
+        this.fn = fn;
+        return this;
+    }
+    mouseMove(x, y, offsetX = 0, offsetY = 0) {
+        this.mousePressed = false;
+        this.shadow = false;
+        if (!this.hit(x - offsetX, y - offsetY))
+            return null;
+        return this;
+    }
+    mouseDown(x, y, offsetX = 0, offsetY = 0) {
+        this.mousePressed = false;
+        if (!this.hit(x - offsetX, y - offsetY))
+            return null;
+        this.mousePressed = true;
+        return this;
+    }
+    mouseUp(x, y, offsetX = 0, offsetY = 0) {
+        if (!this.hit(x - offsetX, y - offsetY))
+            return null;
+        if (this.mousePressed) {
+            this.fn("menu changes json goes here?");
+        }
+        this.mousePressed = false;
+        return this;
+    }
+    update(scene) {
+    }
+    render(ctx, offsetX, offsetY) {
+        super.render(ctx, offsetX, offsetY);
+    }
+}
+class GameButton extends GameControl {
+    constructor(caption, x, y, width, height) {
+        super(x, y, width, height);
+        this.caption = caption;
+        this.setColor(new Color(0, 0, 155, 1));
+        this.setTextColor(new Color(255, 255, 255, 1));
+        this.setFont("20px Arial");
+        this.border = true;
+        this.shadowColor = new Color(255, 255, 255, 1);
+        this.shadowBlur = 16;
+    }
+    mouseMove(x, y, offsetX = 0, offsetY = 0) {
+        if (!super.mouseMove(x, y, offsetX, offsetY))
+            return null;
+        console.log("move");
+        this.shadow = true;
+        return this;
+    }
+    mouseDown(x, y, offsetX = 0, offsetY = 0) {
+        if (!super.mouseDown(x, y, offsetX, offsetY))
+            return null;
+        console.log("button mouse down", x, y);
+        return this;
+    }
+    mouseUp(x, y, offsetX = 0, offsetY = 0) {
+        if (!super.mouseUp(x, y, offsetX, offsetY))
+            return null;
+        return this;
+    }
+    update(scene) {
+    }
+    render(ctx, offsetX, offsetY) {
+        super.render(ctx, offsetX, offsetY);
+        let dx = this.x + offsetX + 10;
+        let dy = this.y + offsetY + 10;
+        this.drawText(ctx, this.caption, dx, dy);
+    }
+}
 class TextBox extends Rectangle {
     constructor(x, y, width, height) {
         super(x, y, width, height);
@@ -88,6 +189,7 @@ class TextBox extends Rectangle {
         this.fontSize = 24;
         this.text = "";
         this.lineOffset = 0;
+        this.border = true;
     }
     newLine(letter) {
         if (letter === "\n" || letter === " ") {
@@ -125,7 +227,7 @@ class TextBox extends Rectangle {
 }
 class GameLayer extends GameObject {
     constructor(x = 0, y = 0, width = 640, height = 480) {
-        super(0, 0, width, height);
+        super(x, y, width, height);
         this.objects = new Array();
     }
     addObject(obj) {
@@ -144,16 +246,16 @@ class GameLayer extends GameObject {
         this.objects.forEach((obj) => { obj.mouseMove(x, y); });
         return this;
     }
-    mouseDown(x, y, button) {
+    mouseDown(x, y) {
         if (!this.hit(x, y))
             return null;
-        this.objects.forEach((obj) => { obj.mouseDown(x, y, button); });
+        this.objects.forEach((obj) => { obj.mouseDown(x, y); });
         return this;
     }
-    mouseUp(x, y, button) {
+    mouseUp(x, y) {
         if (!this.hit(x, y))
             return null;
-        this.objects.forEach((obj) => { obj.mouseUp(x, y, button); });
+        this.objects.forEach((obj) => { obj.mouseUp(x, y); });
         return this;
     }
     render(ctx, offsetX = 0, offsetY = 0) {
@@ -167,28 +269,31 @@ class GameMenu extends GameLayer {
         this.setColor(new Color(0, 0, 255, 1));
         this.setTextColor(new Color(255, 255, 255, 1));
         this.setFont("20px Arial");
+        this.border = true;
     }
-    mouseMove(x, y) {
+    mouseMove(x, y, offsetX = 0, offsety = 0) {
         if (!this.hit(x, y))
             return null;
-        this.objects.forEach((obj) => { obj.mouseMove(x, y); });
+        this.objects.forEach((obj) => { obj.mouseMove(x, y, this.x, this.y); });
         return this;
     }
-    mouseDown(x, y, button) {
+    mouseDown(x, y, offsetX = 0, offsetY = 0) {
         if (!this.hit(x, y))
             return null;
-        console.log("menu mouse down", x, y, button);
+        this.objects.forEach((obj) => { obj.mouseDown(x, y, this.x, this.y); });
         return this;
     }
-    mouseUp(x, y, button) {
+    mouseUp(x, y, offsetX = 0, offsetY = 0) {
         if (!this.hit(x, y))
             return null;
+        this.objects.forEach((obj) => { obj.mouseUp(x, y, this.x, this.y); });
         return this;
     }
     update(scene) {
     }
     render(ctx, offsetX, offsetY) {
         super.render(ctx, offsetX, offsetY);
+        this.objects.forEach((obj) => { obj.render(ctx, this.x, this.y); });
     }
 }
 class GameEvent {
@@ -421,12 +526,12 @@ class GameScene {
         this.layers.forEach((layer) => { layer.mouseMove(x, y); });
         return this;
     }
-    mouseDown(x, y, button) {
-        this.layers.forEach((layer) => { layer.mouseDown(x, y, button); });
+    mouseDown(x, y) {
+        this.layers.forEach((layer) => { layer.mouseDown(x, y); });
         return this;
     }
-    mouseUp(x, y, button) {
-        this.layers.forEach((layer) => { layer.mouseUp(x, y, button); });
+    mouseUp(x, y) {
+        this.layers.forEach((layer) => { layer.mouseUp(x, y); });
         return this;
     }
     render(ctx) {
@@ -447,20 +552,21 @@ class GameEngine {
         let tb = new TextBox(20, 20, 240, 120);
         layer.addObject(tb);
         scene.addLayer(layer);
-        let fade = new FadeEvent("fadein", tb, 1000);
+        let fade = new FadeEvent("fadein", tb, 3000);
         let arr = [
             "Hello@5\n",
             "How are you?@5\n",
             "I am really hoping that this text will wrap within the set parameters.@5\n",
             "It's@5 just@5 that@5 I can't believe this works.@9"
         ];
-        let de = new DialogEvent(arr, tb);
-        let toe = new TranslateObjectEvent(tb).setTarget(200, 200).setSpeed(1);
-        let de2 = new DialogEvent(["\n\n\nI@3 @3a@3m@3 @3f@3i@3n@3e@3.@3"], tb);
         let menu = new GameMenu(100, 100, 200, 100);
+        let but = new GameButton("click", 50, 50, 50, 50).setFunction((text) => {
+            console.log(text);
+        });
+        menu.addObject(but);
         let aoe = new AddObjectsEvent(layer, 1, menu);
         let ome = new OpenMenuEvent(menu);
-        scene.queueEvents([fade, de, toe, de2, aoe, ome]);
+        scene.queueEvents([fade, aoe, ome]);
         this.setScene(scene);
     }
     start() {
@@ -485,11 +591,11 @@ class GameEngine {
     }
     mouseDown(e) {
         this.setMouseCoords(e);
-        this.scene.mouseDown(this.mouseX, this.mouseY, e.button);
+        this.scene.mouseDown(this.mouseX, this.mouseY);
     }
     mouseUp(e) {
         this.setMouseCoords(e);
-        this.scene.mouseUp(this.mouseX, this.mouseY, e.button);
+        this.scene.mouseUp(this.mouseX, this.mouseY);
     }
     render() {
         this.scene.render(this.ctx);

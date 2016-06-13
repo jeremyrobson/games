@@ -15,6 +15,7 @@ class TextBox extends Rectangle {
         this.fontSize = 24;
         this.text = ""; //not necessarily needed
         this.lineOffset = 0;
+        this.border = true;
     }
 
     newLine(letter: string) {

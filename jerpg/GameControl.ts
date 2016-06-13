@@ -1,42 +1,50 @@
 /// <reference path="definitions.d.ts"/>
 
-class GameMenu extends GameLayer {
-    
+class GameControl extends GameObject {
+    mousePressed: boolean;
+    fn: Function;
+
     constructor(x: number, y: number, width: number, height: number) {
         super(x, y, width, height);
         
         this.setColor(new Color(0,0,255,1));
         this.setTextColor(new Color(255,255,255,1));
         this.setFont("20px Arial");
-        this.border = true;
+        this.mousePressed = false;
     }
     
-    mouseMove(x: number, y: number, offsetX: number = 0, offsety: number = 0) : this {
-        if (!this.hit(x, y)) return null;
+    setFunction(fn: Function) : this {
+        this.fn = fn;
+        return this;
+    }
 
-        this.objects.forEach(
-           (obj: GameObject) => { obj.mouseMove(x, y, this.x, this.y) }
-        );
+    mouseMove(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this {
+        this.mousePressed = false;
+        this.shadow = false;
+ 
+        if (!this.hit(x - offsetX, y - offsetY)) return null;
 
         return this;
     }
 
     mouseDown(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this {
-        if (!this.hit(x, y)) return null;
+        this.mousePressed = false;
 
-        this.objects.forEach(
-            (obj: GameObject) => { obj.mouseDown(x, y, this.x, this.y) }
-        );
+        if (!this.hit(x - offsetX, y - offsetY)) return null;
+
+        this.mousePressed = true;
 
         return this;
     }
 
     mouseUp(x: number, y: number, offsetX: number = 0, offsetY: number = 0) : this {
-        if (!this.hit(x, y)) return null;
+        if (!this.hit(x - offsetX, y - offsetY)) return null;
 
-        this.objects.forEach(
-            (obj: GameObject) => { obj.mouseUp(x, y, this.x, this.y) }
-        );
+        if (this.mousePressed) {
+            this.fn("menu changes json goes here?");
+        }
+
+        this.mousePressed = false;
 
         return this;
     }
@@ -47,10 +55,7 @@ class GameMenu extends GameLayer {
     
     render(ctx: CanvasRenderingContext2D, offsetX: number, offsetY: number) {
         super.render(ctx, offsetX, offsetY);
-       
-        this.objects.forEach(
-            (obj: GameObject) => { obj.render(ctx, this.x, this.y) }  
-        );
+        
     }
 
 }

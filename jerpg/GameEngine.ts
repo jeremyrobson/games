@@ -29,9 +29,10 @@ class GameEngine {
         let tb = new TextBox(20, 20, 240, 120); //change to GameMenu or GameDialog?
 
         layer.addObject(tb);
+
         scene.addLayer(layer);
         
-        let fade = new FadeEvent("fadein", tb, 1000);
+        let fade = new FadeEvent("fadein", tb, 3000);
 
         let arr: Array<string> = [
             "Hello@5\n",
@@ -39,19 +40,23 @@ class GameEngine {
             "I am really hoping that this text will wrap within the set parameters.@5\n",
             "It's@5 just@5 that@5 I can't believe this works.@9"
         ];
-        let de = new DialogEvent(arr, tb);
+        //let de = new DialogEvent(arr, tb);
 
-        let toe = new TranslateObjectEvent(tb).setTarget(200, 200).setSpeed(1);
-
-        let de2 = new DialogEvent(["\n\n\nI@3 @3a@3m@3 @3f@3i@3n@3e@3.@3"], tb);
+        //let toe = new TranslateObjectEvent(tb).setTarget(200, 200).setSpeed(1);
 
         let menu = new GameMenu(100, 100, 200, 100);
+
+        let but = new GameButton("click", 50, 50, 50, 50).setFunction((text: string) => {
+            console.log(text);
+        });
+
+        menu.addObject(but);
 
         let aoe = new AddObjectsEvent(layer, 1, menu);
 
         let ome  = new OpenMenuEvent(menu);
 
-        scene.queueEvents([fade, de, toe, de2, aoe, ome]);
+        scene.queueEvents([fade, aoe, ome]);
 
         this.setScene(scene);
     }
@@ -86,12 +91,12 @@ class GameEngine {
 
     mouseDown(e: MouseEvent) {
         this.setMouseCoords(e);
-        this.scene.mouseDown(this.mouseX, this.mouseY, e.button);
+        this.scene.mouseDown(this.mouseX, this.mouseY);
     }
 
     mouseUp(e: MouseEvent) {
         this.setMouseCoords(e);
-        this.scene.mouseUp(this.mouseX, this.mouseY, e.button);
+        this.scene.mouseUp(this.mouseX, this.mouseY);
     }
 
     render() {
