@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+
+<script src="color.js"></script>
+<script src="game.js"></script>
+<script src="gameobject.js"></script>
+<script src="gameuser.js"></script>
+<script src="gameunit.js"></script>
+<script src="gamemap.js"></script>
+<script>
+var canvas, context;
+var module;
+var user;
+var lasttick = 0, fps = 0, frames = 0;
+
+function loop() {
+    user.loop();
+    module.loop();
+    
+    if (lasttick + 1000 < Date.now()) {
+        fps = frames;
+        frames = 0;
+        lasttick = Date.now();
+    }
+    frames++;
+    
+    draw();
+    window.requestAnimationFrame(loop);
+}
+
+function mouseDown(e) {
+    module.mouseDown(e.offsetX, e.offsetY);
+}
+
+function mouseMove(e) {
+    module.mouseMove(e.offsetX, e.offsetY);
+}
+
+function draw() {
+    module.draw(context);
+    
+    context.fillStyle = "rgba(255,255,0,1)";
+    context.font = "32px Arial";
+    context.fillText("fps: " + fps, 20, 20);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    canvas.onmousedown = mouseDown;
+    canvas.onmousemove = mouseMove;
+    
+    user = new GameUser();
+    module = new WorldMap("World", 8, 8, user.party.units);
+    module.locus = user;
+    
+    loop();
+};
+
+</script>
+    
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>    
+    
+</body>
+    
+</html>

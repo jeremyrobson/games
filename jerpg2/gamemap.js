@@ -1,6 +1,7 @@
 let tiletemplates = {
     "water": {
-        "color": "rgb(0,0,255)"
+        "color": "rgb(0,0,255)",
+        "shine": 1
     },
     "grass": {
         "color": "rgb(0,255,0)"
@@ -30,19 +31,16 @@ let maptypes = ["world", "town", "dungeon"];
 let maptemplates = {
     "world": {
         "tiles": ["water", "grass"],
-        //"doors": ["town", "dungeon"],
         "objects": ["tree"],
         "maptypes": ["house"],
     },
     "town": {
         "tiles": ["tree", "grass", "road"],
-        //"doors": ["exit"],
         "objects": ["house"],
         "maptypes": ["house"],
     },
     "dungeon": {
         "tiles": ["stone", "path"],
-        //"doors": ["exit", "dungeon"],
         "objects": ["treasure"],
         "maptypes": ["dungeon"]
     },
@@ -60,10 +58,13 @@ class GameMap {
         this.objects = generate_objects(maptemplates[maptype]["objects"])
         this.doors = generate_doors(maptemplates[maptype]["maptypes"], this, parentmap, doorcount);
         this.tiles = generate_tiles(maptemplates[maptype]["tiles"], this.doors);
+        this.particles = [];
     }
     
     loop() {
-      
+        this.particles.forEach(function(p) {
+           p.loop(); 
+        });
     }
 
     mouseDown(mx, my) {
@@ -73,21 +74,34 @@ class GameMap {
         if (door) {
             return door.destmap;
         }
+        //this.particles.push(new Sparkle(mx, my, 5, "rgba(255,255,255,0.5)",100));
         return this;
     }
     
-    draw(ctx) {
+    draw(ctx, tick) {
         for (var x=0;x<16;x++) {
             for (var y=0;y<16;y++) {
                 var color = this.tiles[x][y].color;
                 ctx.fillStyle = color;
                 ctx.fillRect(x*16,y*16,16,16);
+                
+                if (this.tiles[x][y].shine) {
+                    var xoffset = tick * 16;
+                    var a = tick * (x  - xoffset) / 16;
+                    var shine = "rgba(255,255,255," + a + ")";
+                    ctx.fillStyle = shine;
+                    ctx.fillRect(x*16,y*16,16,16);
+                }
             }
         }
         
         this.doors.forEach(function(door) {
             ctx.fillStyle = "rgb(255,255,0)";
-            ctx.fillRect(door.x*16,door.y*16,16,16);
+            ctx.fillRect(door.x*16+4,door.y*16+4,8,8);
+        });
+        
+        this.particles.forEach(function(p) {
+           p.draw(ctx); 
         });
     }
 }
@@ -114,14 +128,13 @@ function generate_doors(arr, map, parentmap, doorcount = 3) {
     
     if (parentmap) {
         doors.push(new Door("exit", parentmap));
-        console.log(parentmap);
     }
 
     
     for (var i=0; i<doorcount; i++) {
         var doortype = arr.random();
         var maptype = map.maptypes.random();
-        var newmap = new GameMap(maptype, map, doorcount - 1);
+        var newmap = null; //new GameMap(maptype, map, doorcount - 1);
         doors.push(new Door(doortype, newmap));
     }
     return doors;
@@ -139,8 +152,8 @@ function generate_tiles(arr, doors) {
     }
     
     doors.forEach(function(door, i) {
-        tiles[door.x][door.y].door = door;
         generate_path(tiles, arr[1], door, doors[i-1]);
+        tiles[door.x][door.y].door = door;
     });
     
     return tiles;
@@ -152,7 +165,9 @@ function generate_path(tiles, pathtile, srcdoor, destdoor) {
     var sx = srcdoor.x;
     var sy = srcdoor.y;
   
-    while (sx != destdoor.x && sy != destdoor.y) {
+    tiles[sx][sy] = clone(tiletemplates[pathtile]);
+  
+    while (sx != destdoor.x || sy != destdoor.y) {
         var dx = destdoor.x - sx;
         var dy = destdoor.y - sy;
         var angle = Math.atan2(dy, dx);
@@ -163,9 +178,9 @@ function generate_path(tiles, pathtile, srcdoor, destdoor) {
             sx = sx + ax;
         else
             sy = sy + ay;
-          
-        if (!tiles[sx][sy].door)
-            tiles[sx][sy] = tiletemplates[pathtile];
+        
+        tiles[sx][sy] = clone(tiletemplates[pathtile]);
+        pad(tiles, sx, sy, pathtile)
     }
 }
 
@@ -177,4 +192,16 @@ function generate_objects(arr) {
     }
     
     return objects;
+}
+
+function pad(tiles, x, y, pathtile) {
+    var tile = clone(tiletemplates[pathtile]);
+    
+    for (var tx = x-1; tx <= x+1; tx++) {
+        for (var ty = y-1; ty <= y+1; ty++) {
+            if (tiles[tx] && tiles[tx][ty]) {
+                tiles[tx][ty] = tile;
+            }
+        }
+    }
 }

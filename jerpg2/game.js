@@ -3,8 +3,10 @@ var user;
 var module;
 
 function loop() {
+    var tick = Date.now();
+    
     module.loop();
-    draw();
+    draw(tick);
     
     window.requestAnimationFrame(loop);
 }
@@ -16,8 +18,8 @@ function mouseDown(e) {
     module = module.mouseDown(mx, my);
 }
 
-function draw() {
-    module.draw(context);
+function draw(tick) {
+    module.draw(context, tick);
 }
 
 function init() {
