@@ -11,8 +11,8 @@ class GameUser {
     }
     
     
-    mouseDown(x, y) {
-        this.party.mouseDown(x, y);
+    mouseDown(x, y, selobject) {
+        this.party.mouseDown(x, y, selobject);
         
         this.movetarget = {
             "x": x,
