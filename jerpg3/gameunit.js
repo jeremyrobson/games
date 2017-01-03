@@ -7,37 +7,14 @@ var unittypes = {
     }
 };
 
-var aitypes = {
-    "None": {
-        "loop": function() {
-            
-        }
-    },
-    "Following": {
-        "loop": function() {
-            this.movetarget = this.followtarget;
-        }
-    },
-    "Loitering": {
-        "loop": function() {
-            if (this.movetarget === null) {
-                this.movetarget = module.objects.random();
-            }
-        }
-    }
-};
-
 class GameUnit {
     constructor(type, x, y, color, ai) {
         this.x = x;
         this.y = y;
         this.speed = 0.1;
         this.color = color;
-        this.followtarget = null;
-        this.movetarget = null;
-        this.actiontarget = null;
         this.size = 24;
-        this.ai = aitypes[ai];
+        this.ai = ai;
         
         this.type = type;
         var spritetemplate = clone(unittypes[type]);
@@ -45,30 +22,7 @@ class GameUnit {
     }
     
     loop() {
-        this.ai.loop.call(this);
-        
-        this.move();
-    }
-    
-    move() {
-        if (this.movetarget) {
-            var distance = getDistance(this, this.movetarget);
-            
-            if (distance > 1) {
-            
-                var dx = this.movetarget.x - this.x;
-                var dy = this.movetarget.y - this.y;
-                var angle = Math.atan2(dy, dx);
-                
-                this.speed = clamp(distance / 10, 0, 2.0);
-                
-                this.x = this.x + Math.cos(angle) * this.speed;
-                this.y = this.y + Math.sin(angle) * this.speed;
-            }
-            else
-                this.movetarget = null;
-        }
-
+        this.ai.loop(this);
     }
     
     draw(ctx,offsetx=0,offsety=0) {
@@ -82,12 +36,11 @@ class GameUnit {
     }
     
     setMoveTarget(movetarget) {
-        this.movetarget = movetarget;
-        
+        this.ai.setMoveTarget(movetarget);
     }
     
     setFollowTarget(followtarget) {
-        this.followtarget = followtarget;
+        this.ai.setFollowTarget(followtarget);
     }
 }
 
@@ -96,9 +49,6 @@ class Party {
         this.units = [];
         this.x = x;
         this.y = y;
-        this.movetarget = null;
-        this.followtarget = null;
-        this.actiontarget = null;
         
         for (var i=0; i<count; i++) {
             var followtarget = this.units[i-1];
@@ -108,10 +58,9 @@ class Party {
                 x,
                 y,
                 new Color(255,255,0,1),
-                "Following"
+                new Following(followtarget)
             );
             
-            newunit.setFollowTarget(followtarget);
             this.units.push(newunit);
         }
     }
@@ -126,13 +75,16 @@ class Party {
 
     }
     
-    mouseDown(x, y) {
-        this.followtarget = {
+    mouseDown(x, y, selobject) {
+        var followtarget = {
             "x": x,
             "y": y
         };
         
-        this.units[0].setFollowTarget(this.followtarget);
+        if (selobject)
+            followtarget = selobject;
+        
+        this.units[0].setFollowTarget(followtarget);
     }
     
     draw(ctx,offsetx=0,offsety=0) {

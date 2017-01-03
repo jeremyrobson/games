@@ -51,7 +51,7 @@ class GameMap {
         
         console.log(mx, my);
         
-        this.locus.mouseDown(mx, my);
+        this.locus.mouseDown(mx, my, this.selobject);
     }
     
     mouseMove(mx, my) {
@@ -136,7 +136,7 @@ function generate_units(maptype) {
         var x = randint(0, 8192);
         var y = randint(0, 8192);
         var color = "rgba(255,255,255,1)";
-        var ai = "Loitering";
+        var ai = new Loitering();
         var newunit = new GameUnit(unittype, x, y, color, ai);
         units.push(newunit);
     }
