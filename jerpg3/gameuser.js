@@ -25,13 +25,8 @@ class GameUser {
             var distance = getDistance(this, this.movetarget);
             
             if (distance > 1) {
-            
-                var dx = this.movetarget.x - this.x;
-                var dy = this.movetarget.y - this.y;
-                var angle = Math.atan2(dy, dx);
-                
+                var angle = getAngle(this, this.movetarget);
                 this.speed = clamp(distance / 10, 0, 3);
-                
                 this.x = this.x + Math.cos(angle) * this.speed;
                 this.y = this.y + Math.sin(angle) * this.speed;
             }

@@ -4,6 +4,7 @@
 
 <script src="color.js"></script>
 <script src="game.js"></script>
+<script src="gameaction.js"></script>
 <script src="gameai.js"></script>
 <script src="gameobject.js"></script>
 <script src="gameuser.js"></script>
@@ -15,14 +16,17 @@ var module;
 var user;
 var lasttick = 0, fps = 0, frames = 0;
 
+const QUAD_WIDTH = 640;
+const QUAD_HEIGHT = 480;
+
 function loop() {
     user.loop();
     module.loop();
     
-    if (lasttick + 1000 < Date.now()) {
+    if (lasttick + 1000 < performance.now()) {
         fps = frames;
         frames = 0;
-        lasttick = Date.now();
+        lasttick = performance.now();
     }
     frames++;
     
@@ -53,7 +57,7 @@ window.onload = function() {
     canvas.onmousemove = mouseMove;
     
     user = new GameUser();
-    module = new WorldMap("World", 8, 8, user.party.units);
+    module = new WorldMap("World", 12, user.party.units);
     module.locus = user;
     
     loop();
