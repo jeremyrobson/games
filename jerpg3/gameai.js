@@ -12,6 +12,25 @@ function moveAwayFrom(target, distance) {
     this.y = this.y + Math.sin(angle) * this.speed;
 }
 
+function getLocalObjects(obj, map) {
+    var x0 = clamp(obj.qx - 1, 0, map.jeremy-1);
+    var x1 = clamp(obj.qx + 1, 0, map.jeremy-1);
+    var y0 = clamp(obj.qy - 1, 0, map.jeremy-1);
+    var y1 = clamp(obj.qy + 1, 0, map.jeremy-1);
+
+    var objectList = [];
+
+    for (var x=x0; x<=x1; x++) {
+        for (var y=y0; y<=y1; y++) {
+            map.quads[x][y].forEach(function(o) {
+                objectList.push(o);
+            });
+        }
+    }
+
+    return objectList;
+}
+
 class GameAI {
     constructor(followtarget, movetarget, actiontarget) {
         this.followtarget = followtarget;
@@ -69,7 +88,7 @@ class Loitering extends GameAI {
         super(null, null, null);
     }
     
-    loop(self) {
+    loop(self, map) {
         super.loop(self);
         
         if (this.movetarget)
@@ -84,7 +103,8 @@ class Loitering extends GameAI {
         }
         
         if (this.targetReached || !this.movetarget) {
-            this.movetarget = module.objects.random();
+            var localObjects = getLocalObjects(self, map);
+            this.movetarget = localObjects.random();
             this.targetReached = false;
         }
     }
@@ -93,26 +113,58 @@ class Loitering extends GameAI {
 class Hunting extends GameAI {
     constructor() {
         super(null, null, null);
+        
+        //hunting radius
+        this.minDistance = 200;
     }
     
-    loop(self) {
+    loop(self, map) {
         super.loop(self);
         
-        if (this.movetarget)
-            this.distance = getDistance(self, this.movetarget);
+        if (!this.actiontarget)
+            this.acquireActionTarget(self, map);
+        else {
+            this.distance = getDistance(self, this.actiontarget);
         
-        if (this.distance > this.minDistance)
-            self.moveTowards(this.movetarget, this.distance);
-        
-        if (this.distance <= this.minDistance) {
-            this.targetReached = true;
-            this.movetarget = null;
+            if (this.distance > this.minDistance)
+                self.moveTowards(this.actiontarget, this.distance);
+            
+            if (this.distance <= this.minDistance) {
+                this.backupai = this.ai;
+                this.ai = new Attacking(null, null, this.actiontarget);
+            }
         }
+    }
+    
+    acquireTarget(self, map) {
+        var target = null;
         
-        if (this.targetReached || !this.movetarget) {
-            this.movetarget = module.objects.random();
-            this.targetReached = false;
-        }
+        var localObjects = getLocalObjects(self, map);
+        var targetList = [];
+
+
+        localObjects.forEach(function(o) {
+            var possibleTarget = {
+                "object": o,
+                "distance": getDistance(self, o),
+                "score": 0
+            };
+            targetList.push(possibleTarget);
+        });
+        
+        targetList.sort(function(a,b) {
+            return a.distance - b.distance;
+        });
+
+        console.log(targetList);
+
+        //filter based on type
+        //sort based on "score"
+        //score comes from distance, hp left, unit type, etc.
+        
+        target = targetList[0];
+
+        return target;
     }
 }
 

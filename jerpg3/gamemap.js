@@ -7,6 +7,7 @@ var maptypes = {
 
 class GameMap {
     constructor(maptype, jeremy, units) {
+        this.jeremy = jeremy; //number of quads wide/high
         this.width = QUAD_WIDTH * jeremy;
         this.height = QUAD_HEIGHT * jeremy;
         this.quads = generate_quads(jeremy);
@@ -17,10 +18,10 @@ class GameMap {
         this.offsety = 0;
         this.mouse = {"x": 0, "y": 0};
         this.hoverobject = null;
-        
-        this.objects = generate_objects(maptype, jeremy);
+        this.objects = [];
 
-        this.addObjects(units, 0, 0);
+        this.addObjects(generate_objects(maptype, jeremy));
+        this.addObjects(units);
     }
     
     addObjects(arr) {
@@ -59,7 +60,7 @@ class GameMap {
         
         var distance;
         this.objects.forEach(function(o) {
-            o.loop();
+            o.loop(this);
             
             distance = getDistance(this.mouse, o);
             
@@ -170,7 +171,9 @@ function generate_objects(maptype, jeremy) {
     for (var i=0;i<10000;i++) {
         var x = randint(0, jeremy * QUAD_WIDTH);
         var y = randint(0, jeremy * QUAD_HEIGHT);
-        var newobj = new GameObject(maptype, x, y);
+        var type = maptypes[maptype].objecttypes.random();
+        var sprite = String.fromCodePoint(parseInt(mapobjects[type].code));
+        var newobj = new GameObject(type, x, y, sprite, 32);
         objects.push(newobj);
     }
     
@@ -186,7 +189,7 @@ function generate_units(maptype, jeremy) {
         var y = randint(0, jeremy * QUAD_HEIGHT);
         var color = "rgba(255,255,255,1)";
         var ai = new Loitering();
-        var newunit = new GameUnit(unittype, x, y, color, ai);
+        var newunit = new GameUnit(unittype, x, y, null, 24, color, ai);
         units.push(newunit);
     }
     

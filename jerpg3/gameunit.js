@@ -7,37 +7,28 @@ var unittypes = {
     }
 };
 
-class GameUnit {
-    constructor(type, x, y, color, ai) {
-        this.id = guid();
-        this.x = x;
-        this.y = y;
-        this.qx = Math.floor(this.x / QUAD_WIDTH);
-        this.qy = Math.floor(this.y / QUAD_HEIGHT);
-        this.lqx = this.qx;
-        this.lqy = this.qy;
-        this.speed = 0.1;
-        this.color = color;
-        this.size = 24;
+class GameUnit extends GameObject {
+    constructor(type, x, y, sprite, size, color, ai) {
+        super(type, x, y, sprite, size, color);
+
         this.ai = ai;
         this.action = null;
         this.moveTowards = moveTowards.bind(this);
         this.moveAwayFrom = moveAwayFrom.bind(this);
         this.minDistance = null;
 
-        this.type = type;
         var spritetemplate = clone(unittypes[type]);
         this.sprite = String.fromCodePoint(spritetemplate.sprite);
     }
     
-    loop() {
+    loop(map) {
         if (this.action) {
             this.minDistance = this.action.range;
         }
         else
             this.minDistance = 1;
         
-        this.ai.loop(this);
+        this.ai.loop(this, map);
         
         this.qx = Math.floor(this.x / QUAD_WIDTH);
         this.qy = Math.floor(this.y / QUAD_HEIGHT);
@@ -75,6 +66,8 @@ class Party {
                 "Human",
                 x,
                 y,
+                null,
+                24,
                 new Color(255,255,0,1),
                 new Following(followtarget)
             );

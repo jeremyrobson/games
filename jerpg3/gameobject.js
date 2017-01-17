@@ -14,14 +14,19 @@ var maptypes = {
 };
 
 class GameObject {
-    constructor(maptype, x, y) {
-        var objecttype = maptypes[maptype].objecttypes.random();
-        
+    constructor(type, x, y, sprite, size, color = "rgba(255,255,255,1.0)") {
+        this.id = guid();
+        this.type = type;
+        this.sprite = sprite;
         this.x = x;
         this.y = y;
-        this.color = "rgba(255,255,255,1)";
-        this.sprite = String.fromCodePoint(parseInt(mapobjects[objecttype].code));
-        this.size = 32;
+        this.qx = Math.floor(this.x / QUAD_WIDTH);
+        this.qy = Math.floor(this.y / QUAD_HEIGHT);
+        this.lqx = this.qx;
+        this.lqy = this.qy;
+        this.speed = 0.1;
+        this.color = color;
+        this.size = size;
     }
     
     loop() {
