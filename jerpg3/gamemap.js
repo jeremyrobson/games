@@ -19,6 +19,7 @@ class GameMap {
         this.mouse = {"x": 0, "y": 0};
         this.hoverobject = null;
         this.objects = [];
+        this.actions = [];
 
         this.addObjects(generate_objects(maptype, jeremy));
         this.addObjects(units);
@@ -31,6 +32,10 @@ class GameMap {
         }, this);
     }
     
+    addAction(action) {
+        this.actions.push(action);
+    }
+
     updateQuads(o) {
         if (o.qx != o.lqx || o.qy != o.lqy) {
             
@@ -69,6 +74,12 @@ class GameMap {
             
             this.updateQuads(o);    
         }, this);
+
+        this.actions.forEach(function(a) {
+            a.loop();
+        });
+
+        this.garbageCollection();
     }
     
     mouseDown(mx, my) {
@@ -134,6 +145,21 @@ class GameMap {
             ctx.fillStyle = "rgba(255,255,0,0.8)";
             ctx.strokeRect(dx, dy, 32, 32);
         }
+
+        //this.actions.forEach(function(a) {
+        //    a.draw(ctx);
+        //});
+    }
+
+    //todo
+    garbageCollection() {
+        //this.objects = this.objects.filter(function(o) {
+        //    return o;
+        //});
+
+        this.actions = this.actions.filter(function(a) {
+            return a.life > 0;
+        });
     }
 }
 

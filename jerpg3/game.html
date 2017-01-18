@@ -56,7 +56,7 @@ window.onload = function() {
     canvas.onmousedown = mouseDown;
     canvas.onmousemove = mouseMove;
     
-    user = new GameUser();
+    user = new GameUser("Jeremy");
     module = new WorldMap("World", 12, user.party.units);
     module.locus = user;
     

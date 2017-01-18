@@ -33,9 +33,13 @@ function getLocalObjects(obj, map) {
 
 class GameAI {
     constructor(followtarget, movetarget, actiontarget) {
-        this.followtarget = followtarget;
+        this.action = null;
+        this.followtarget = followtarget; //leadertarget?
         this.movetarget = movetarget;
-        this.actiontarget = actiontarget;
+        this.actiontarget = actiontarget; //todo: convert to array
+        this.attacktarget = [];
+        this.protecttarget = [];
+        this.supporttarget = [];
         this.targetReached = false;
         this.distance = 0;
         this.minDistance = 1;
@@ -114,24 +118,30 @@ class Hunting extends GameAI {
     constructor() {
         super(null, null, null);
         
-        //hunting radius
-        this.minDistance = 200;
     }
     
     loop(self, map) {
         super.loop(self);
         
-        if (!this.actiontarget)
-            this.acquireActionTarget(self, map);
+        if (!this.actiontarget) {
+            this.action = null;
+            this.actiontarget = this.acquireTarget(self, map);
+        }
+        else if (!this.action) {
+            this.actions = self.getActions("offensive");
+            var actionClass = this.actions.random();
+            this.action = new actionClass(self, [this.actiontarget], this);
+            this.minDistance = this.action.minDistance;
+        }
         else {
+
             this.distance = getDistance(self, this.actiontarget);
-        
+
             if (this.distance > this.minDistance)
                 self.moveTowards(this.actiontarget, this.distance);
             
             if (this.distance <= this.minDistance) {
-                this.backupai = this.ai;
-                this.ai = new Attacking(null, null, this.actiontarget);
+                map.addAction(this.action);
             }
         }
     }
@@ -142,8 +152,10 @@ class Hunting extends GameAI {
         var localObjects = getLocalObjects(self, map);
         var targetList = [];
 
-
-        localObjects.forEach(function(o) {
+        localObjects.filter(function(o) {
+            return o instanceof GameUnit &&
+            o.team != self.team;
+        }).forEach(function(o) {
             var possibleTarget = {
                 "object": o,
                 "distance": getDistance(self, o),
@@ -152,6 +164,9 @@ class Hunting extends GameAI {
             targetList.push(possibleTarget);
         });
         
+        if (targetList.length == 0)
+            return null;
+
         targetList.sort(function(a,b) {
             return a.distance - b.distance;
         });
@@ -162,7 +177,7 @@ class Hunting extends GameAI {
         //sort based on "score"
         //score comes from distance, hp left, unit type, etc.
         
-        target = targetList[0];
+        target = targetList[0].object;
 
         return target;
     }
@@ -173,7 +188,7 @@ class Attacking extends GameAI {
         super(null, null, null);
     }
     
-    loop(self) {
+    loop(self, map) {
         super.loop(self);
         
         if (this.actiontarget) {
@@ -183,5 +198,25 @@ class Attacking extends GameAI {
                 self.action.invoke(this.distance);
             }
         }
+    }
+}
+
+class Protecting extends GameAI {
+    constructor() {
+
+    }
+
+    loop(self, map) {
+
+    }
+}
+
+class Supporting extends GameAI {
+    constructor() {
+
+    }
+
+    loop(self, map) {
+
     }
 }

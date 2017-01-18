@@ -1,8 +1,9 @@
 class GameUser {
-    constructor() {
+    constructor(username) {
+        this.team = username;
         this.x = 0;
         this.y = 0;
-        this.party = new Party(5);
+        this.party = new Party(5, 0, 0, this.team);
         this.movetarget = null;
     }
     

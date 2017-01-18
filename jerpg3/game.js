@@ -15,7 +15,21 @@ function wrap(val, max) {
 }
 
 function clone(obj) {
-    return JSON.parse(JSON.stringify(obj));
+    var newobj;
+    if (null == obj || "object" != typeof obj) return obj;
+    if (obj instanceof Array) {
+        newobj = [];
+        for (var i=0;i<obj.length;i++)
+            newobj[i] = clone(obj[i]);
+        return newobj;
+    }
+    else if (obj instanceof Object) {
+        newobj = {};
+        for (var key in obj)
+            newobj[key] = clone(obj[key]);
+        return newobj;
+    }
+    throw new Error("cloning error.");
 }
 
 function getDistance(o1, o2) {

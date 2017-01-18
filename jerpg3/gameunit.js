@@ -1,24 +1,27 @@
 var unittypes = {
     "Human": {
-        "sprite": 0x1F601
+        "sprite": 0x1F601,
+        "actions": [Melee]
     },
     "Snek": {
-        "sprite": 0x1F40D
+        "sprite": 0x1F40D,
+        "actions": [Melee]
     }
 };
 
 class GameUnit extends GameObject {
-    constructor(type, x, y, sprite, size, color, ai) {
+    constructor(type, x, y, sprite, size, color, ai, team) {
         super(type, x, y, sprite, size, color);
 
         this.ai = ai;
-        this.action = null;
+        this.team = team;
         this.moveTowards = moveTowards.bind(this);
         this.moveAwayFrom = moveAwayFrom.bind(this);
         this.minDistance = null;
 
-        var spritetemplate = clone(unittypes[type]);
-        this.sprite = String.fromCodePoint(spritetemplate.sprite);
+        var unittemplate = clone(unittypes[type]);
+        this.sprite = String.fromCodePoint(unittemplate.sprite);
+        this.actions = unittemplate.actions;
     }
     
     loop(map) {
@@ -51,10 +54,18 @@ class GameUnit extends GameObject {
     setFollowTarget(followtarget) {
         this.ai.setFollowTarget(followtarget);
     }
+
+    getActions(type) {
+        var actions = this.actions.filter(function(a) {
+            return a.getType() === type;
+        });
+        return actions;
+    }
 }
 
 class Party {
-    constructor(count, x=0, y=0) {
+    constructor(count, x=0, y=0, team) {
+        this.team = team;
         this.units = [];
         this.x = x;
         this.y = y;
@@ -69,7 +80,8 @@ class Party {
                 null,
                 24,
                 new Color(255,255,0,1),
-                new Following(followtarget)
+                new Following(followtarget),
+                this.team
             );
             
             this.units.push(newunit);
