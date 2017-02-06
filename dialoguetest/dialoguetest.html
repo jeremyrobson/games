@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var objects = [];
+
+class Paragraph {
+    constructor(text) {
+        this.words = text.split(" ");
+    }
+
+    nextWord() {
+        return this.words.shift(0);
+    }
+}
+
+class Dialog {
+    constructor(paragraphs, x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 597;
+        this.height = 160;
+        this.borderSize = 4;
+        this.paragraphs = paragraphs;
+        this.paragraph = this.paragraphs.shift(0);
+        this.lines = [""];
+        this.word = this.paragraph.words.shift(0);
+        this.text = "";
+        this.backColor = "rgba(25,55,155,0.9)";
+        this.fontColor = "rgb(255,255,255)";
+        this.borderColor = "rgba(215,215,215,0.9)"
+        this.font = "24px Arial";
+        this.fontSize = 24;
+        this.lineIndex = 0;
+        this.wIndex = 0;
+    }
+
+    newLine() {
+        this.lines.push("");
+        if (this.lineIndex >= 5) {
+            this.lines.shift();
+        }
+        else {
+            this.lineIndex++;
+        }
+    }
+
+    checkNextWord() {
+        if (context.measureText(this.lines[this.lineIndex] + " " + this.word + 8).width > this.width) {
+            this.newLine();
+        }
+        else {
+            this.lines[this.lineIndex] += " ";
+        }
+    }
+
+    loop() {
+        if (this.wIndex >= this.word.length) {
+            if (this.paragraph.words.length > 0) {
+                this.word = this.paragraph.words.shift(0);
+                this.checkNextWord();
+            }
+            else {
+                this.paragraph = this.paragraphs.shift(0);
+                this.word = this.paragraph.words.shift(0);
+                this.newLine();
+                this.newLine();
+            }
+
+            console.log(this.lines[this.lineIndex] + " " + this.word);
+            this.wIndex = 0;
+        }
+
+        this.lines[this.lineIndex] += this.word[this.wIndex];
+        this.wIndex++;
+    }
+
+    draw(ctx) {
+        ctx.shadowColor = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = this.borderColor;
+        ctx.lineWidth = this.borderSize;
+        ctx.strokeRect(this.x, this.y, this.width, this.height);
+        ctx.fillStyle = this.backColor;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        ctx.textBaseline = "top";
+        ctx.shadowColor = "rgba(0,0,0,0.9)";
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+        ctx.shadowBlur = 5;
+
+        ctx.fillStyle = this.fontColor;
+        ctx.font = this.font;
+        this.lines.forEach(function(line, i) {
+            ctx.fillText(line, this.x + 8, this.y + i * this.fontSize);
+        }, this);
+    }
+}
+
+function loop() {
+
+    objects.forEach(function(o) {
+        o.loop();
+    });
+
+    draw();
+    requestAnimationFrame(loop);
+}
+
+function draw() {
+    context.fillStyle = "rgb(0,0,0)";
+    context.fillRect(0,0,640,480);
+
+    objects.forEach(function(o) {
+        o.draw(context);
+    });
+}
+
+window.onload = function() {
+
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+
+    var p = new Paragraph("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    var p2 = new Paragraph("All done!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    var p3 = new Paragraph("All done!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    var dialog = new Dialog([p,p2, p3], 16, 16);
+
+    objects.push(dialog);
+
+    requestAnimationFrame(loop);
+
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+
+</html>
