@@ -1,3 +1,25 @@
+function clone(obj) {
+    var newobj;
+    if (null == obj || "object" != typeof obj) return obj;
+    if (obj instanceof Array) {
+        newobj = [];
+        for (var i=0;i<obj.length;i++)
+            newobj[i] = clone(obj[i]);
+        return newobj;
+    }
+    else if (obj instanceof Object) {
+        newobj = {};
+        for (var key in obj)
+            newobj[key] = clone(obj[key]);
+        return newobj;
+    }
+    throw new Error("cloning error.");
+}
+
+Array.prototype.random = function() {
+    return this[Math.floor(Math.random() * this.length)];
+};
+
 var materialmultipliers = {
 	"cloth": 1,
 	"leather": 2,
@@ -207,3 +229,25 @@ var jobclasses = {
 		}
 	}
 };
+
+function getStat(key) {
+	var base = this["base-"+key];
+	var multiplier = clone(materialmultipliers[this["material"]]);
+	//var quality = this["quality"];
+	return Math.round(base + base * multiplier / 100);
+}
+
+function createItem(itemtype) {
+	var newitem = clone(itemtemplates[itemtype]);
+
+	var material = newitem["materials"].random();
+	var materialmultiplier = clone(materialmultipliers[material]);
+	var quality = clone(Object.keys(qualitymultipliers).random());
+	//var element = clone(Object.keys(elements).random());
+	
+	newitem["material"] = material;
+	newitem["quality"] = quality;
+	newitem.getStat = getStat;
+	
+	return newitem;
+}
