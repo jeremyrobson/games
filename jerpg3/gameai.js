@@ -12,34 +12,10 @@ function moveAwayFrom(target, distance) {
     this.y = this.y + Math.sin(angle) * this.speed;
 }
 
-function getLocalObjects(obj, map) {
-    var x0 = clamp(obj.qx - 1, 0, map.jeremy-1);
-    var x1 = clamp(obj.qx + 1, 0, map.jeremy-1);
-    var y0 = clamp(obj.qy - 1, 0, map.jeremy-1);
-    var y1 = clamp(obj.qy + 1, 0, map.jeremy-1);
-
-    var objectList = [];
-
-    for (var x=x0; x<=x1; x++) {
-        for (var y=y0; y<=y1; y++) {
-            map.quads[x][y].forEach(function(o) {
-                objectList.push(o);
-            });
-        }
-    }
-
-    return objectList;
-}
-
 class GameAI {
-    constructor(followtarget, movetarget, actiontarget) {
-        this.action = null;
-        this.followtarget = followtarget; //leadertarget?
-        this.movetarget = movetarget;
-        this.actiontarget = actiontarget; //todo: convert to array
-        this.attacktarget = [];
-        this.protecttarget = [];
-        this.supporttarget = [];
+    constructor() {
+        this.movelist = [];
+        this.actionlist = [];
         this.targetReached = false;
         this.distance = 0;
         this.minDistance = 1;
@@ -49,39 +25,40 @@ class GameAI {
         this.minDistance = self.minDistance;
     }
     
-    setMoveTarget(movetarget) {
-        this.movetarget = movetarget;
+    addMoveTarget(movetarget) {
+        this.movelist.push(movetarget);
     }
     
-    setFollowTarget(followtarget) {
-        this.followtarget = followtarget;
+    addActionTarget(action) {
+        this.actionlist.push(action);
     }
 }
 
 class Following extends GameAI {
-    constructor(followtarget) {
-        super(followtarget, null, null);
+    constructor(movetarget) {
+        super();
+        this.addMoveTarget(movetarget);
     }
     
     loop(self) {
         super.loop(self);
         
-        this.movetarget = this.followtarget;
-        
-        if (this.movetarget)
-            this.distance = getDistance(self, this.movetarget);
+        if (this.movelist[0])
+            this.distance = getDistance(self, this.movelist[0]);
         
         if (this.distance > this.minDistance)
-            self.moveTowards(this.movetarget, this.distance);
+            self.moveTowards(this.movelist[0], this.distance);
         
         //if (this.targetReached) {
-            //self.moveAwayFrom(this.movetarget, this.distance);
+            //self.moveAwayFrom(this.movelist[0], this.distance);
             //this.targetReached = false;
         //}
         
         if (this.distance <= this.minDistance) {
             this.targetReached = true;
-            this.movetarget = null;
+
+            if (this.movelist.length > 1) //don't remove the last target because it could start moving again
+                this.movelist.shift(0);
         }
     }
     
@@ -89,26 +66,26 @@ class Following extends GameAI {
 
 class Loitering extends GameAI {
     constructor() {
-        super(null, null, null);
+        super();
     }
     
     loop(self, map) {
         super.loop(self);
         
-        if (this.movetarget)
-            this.distance = getDistance(self, this.movetarget);
+        if (this.movelist[0])
+            this.distance = getDistance(self, this.movelist[0]);
         
         if (this.distance > this.minDistance)
-            self.moveTowards(this.movetarget, this.distance);
+            self.moveTowards(this.movelist[0], this.distance);
         
         if (this.distance <= this.minDistance) {
             this.targetReached = true;
-            this.movetarget = null;
+            this.movelist.shift(0);
         }
         
-        if (this.targetReached || !this.movetarget) {
-            var localObjects = getLocalObjects(self, map);
-            this.movetarget = localObjects.random();
+        if (this.targetReached || this.movelist.length === 0) {
+            var localObjects = map.getLocalObjects(self);
+            this.addMoveTarget(localObjects.random());
             this.targetReached = false;
         }
     }
@@ -123,14 +100,13 @@ class Hunting extends GameAI {
     loop(self, map) {
         super.loop(self);
         
-        if (!this.actiontarget) {
-            this.action = null;
-            this.actiontarget = this.acquireTarget(self, map);
+        if (this.actionlist.length === 0) {
+            this.addActionTarget(this.acquireTarget(self, map));
         }
         else if (!this.action) {
             this.actions = self.getActions("offensive");
-            var actionClass = this.actions.random();
-            this.action = new actionClass(self, [this.actiontarget], this);
+            var ActionClass = this.actions.random();
+            this.action = new ActionClass(self, [this.actiontarget], this);
             this.minDistance = this.action.minDistance;
         }
         else {

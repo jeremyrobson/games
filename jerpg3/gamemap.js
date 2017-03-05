@@ -59,11 +59,35 @@ class GameMap {
         }
     }
     
+    getLocalObjects(obj) {
+        var x0 = clamp(obj.qx - 1, 0, this.jeremy-1);
+        var x1 = clamp(obj.qx + 1, 0, this.jeremy-1);
+        var y0 = clamp(obj.qy - 1, 0, this.jeremy-1);
+        var y1 = clamp(obj.qy + 1, 0, this.jeremy-1);
+
+        var objectList = [];
+
+        for (var x=x0; x<=x1; x++) {
+            for (var y=y0; y<=y1; y++) {
+                this.quads[x][y].forEach(function(o) {
+                    objectList.push(o);
+                });
+            }
+        }
+
+        return objectList;
+        }
+
     loop() {
         this.offsetx = this.locus.x - 320;
         this.offsety = this.locus.y - 240;
         
         var distance;
+
+        this.objects = this.objects.filter(function(o) {
+            return !o.remove;
+        });
+
         this.objects.forEach(function(o) {
             o.loop(this);
             
@@ -104,6 +128,9 @@ class GameMap {
         console.log(this.selobject);
         
         this.locus.mouseDown(mx, my, this.selobject);
+
+        var textball = new TextBall(mx, my, 24, new Color(255,255,255,1), "hello");
+        this.addObjects([textball]);
     }
     
     mouseMove(mx, my) {
@@ -199,7 +226,7 @@ function generate_objects(maptype, jeremy) {
         var y = randint(0, jeremy * QUAD_HEIGHT);
         var type = maptypes[maptype].objecttypes.random();
         var sprite = String.fromCodePoint(parseInt(mapobjects[type].code));
-        var newobj = new GameObject(type, x, y, sprite, 32);
+        var newobj = new GameSprite(type, x, y, 32, null, sprite);
         objects.push(newobj);
     }
     

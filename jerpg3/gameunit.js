@@ -9,9 +9,9 @@ var unittypes = {
     }
 };
 
-class GameUnit extends GameObject {
-    constructor(type, x, y, sprite, size, color, ai, team) {
-        super(type, x, y, sprite, size, color);
+class GameUnit extends GameSprite {
+    constructor(type, x, y, size, color, sprite, ai, team) {
+        super(type, x, y, size, color, sprite);
 
         this.ai = ai;
         this.team = team;
@@ -47,12 +47,8 @@ class GameUnit extends GameObject {
         ctx.fillText(this.sprite,dx,dy);
     }
     
-    setMoveTarget(movetarget) {
-        this.ai.setMoveTarget(movetarget);
-    }
-    
-    setFollowTarget(followtarget) {
-        this.ai.setFollowTarget(followtarget);
+    addMoveTarget(movetarget) {
+        this.ai.addMoveTarget(movetarget);
     }
 
     getActions(type) {
@@ -77,9 +73,9 @@ class Party {
                 "Human",
                 x,
                 y,
-                null,
                 24,
                 new Color(255,255,0,1),
+                null,
                 new Following(followtarget),
                 this.team
             );
@@ -99,15 +95,15 @@ class Party {
     }
     
     mouseDown(x, y, selobject) {
-        var followtarget = {
+        var movetarget = {
             "x": x,
             "y": y
         };
         
         if (selobject)
-            followtarget = selobject;
+            movetarget = selobject;
         
-        this.units[0].setFollowTarget(followtarget);
+        this.units[0].addMoveTarget(movetarget);
     }
     
     draw(ctx,offsetx=0,offsety=0) {
