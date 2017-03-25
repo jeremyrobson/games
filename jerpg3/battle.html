@@ -19,9 +19,10 @@ class BattleTile {
 }
 
 class BattleMap {
-    constructor(width, height) {
+    constructor(width, height, units) {
         this.width = width;
         this.height = height;
+        this.units = units;
         this.tile = [];
         for (var x=0; x<width; x++) {
             this.tile[x] = [];
@@ -69,19 +70,26 @@ class BattleUnit {
         ctx.fillText(this.sprite, this.x * 60, this.y * 60);
     }
 
-    getBestActionMove() {
+    getBestAction(map) {
+        return new BattleAction(this, map.units);
+    }
+
+    getBestMove(map) {
+        return new BattleMove(this);
+    }
+
+    getBestActionMove(map) {
         var targetList = [];
 
-        var action = new BattleAction(this, targetList);
-        var move = new BattleMove(this);
         var actionmove;
 
         if (Math.random() < 0.5) {
-            actionmove = new ActionMove(action, move);
+            actionmove = new ActionMove(this.getBestAction(map), this.getBestMove(map));
         }
         else {
-            actionmove = new ActionMove(move, action);
+            actionmove = new ActionMove(this.getBestMove(map), this.getBestAction(map));
         }
+
         //do ranking here
         return actionmove;
     }
@@ -159,10 +167,10 @@ class ActionMove {
 
 class Battle {
     constructor(party1, party2) {
-        this.map = new BattleMap(8, 8);
         this.units = [];
         this.addUnits(party1.units);
         this.addUnits(party2.units);
+        this.map = new BattleMap(8, 8, this.units);
         this.queue = [];
         this.log = "";
         this.nextAction = null;
@@ -213,21 +221,24 @@ class Battle {
             }
         });
 
-        if (nextUnit)
+        if (nextUnit) {
             return nextUnit;
+        }
 
         var availableUnits = this.units.filter(function(u) {
             return u.state == ""; //also check if alive
         });
 
-        if (availableUnits.length == 0)
+        if (availableUnits.length == 0) {
             return null;
+        }
 
         while (!nextUnit) {
             availableUnits.forEach(function(u) {
                 u.at += u.agl;
-                if (u.at > 100)
+                if (u.at >= 100) {
                     nextUnit = u;
+                }
             });
         }
 
@@ -238,23 +249,27 @@ class Battle {
         var nextAction;
 
         if (this.queue.length > 0) {
+            this.queue.forEach(function(q) {
+                q.ct = q.ct - 1;
+            }, this);
+
             this.queue.sort(function(a,b) {
                 return a.ct - b.ct;
             });
 
             this.queue.forEach(function(q) {
-                q.ct = q.ct - 1;
                 this.log += q.toString() + "\n";
             }, this);
 
-            if (this.queue[0].ct <= 0)
+            if (this.queue[0].ct <= 0) {
                 nextAction = this.queue.shift();
+            }
         }
 
         if (!nextAction) {
             var nextUnit = this.getNextActiveUnit();
             if (nextUnit) {
-                var actionmove = nextUnit.getBestActionMove();
+                var actionmove = nextUnit.getBestActionMove(this.map);
                 nextAction = actionmove.first;
                 this.queueActionMove(actionmove.second);
             }
