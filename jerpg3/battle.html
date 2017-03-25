@@ -10,6 +10,7 @@ class BattleTile {
         this.x = x;
         this.y = y;
         this.color = "rgb(0,200,0)";
+        this.unit = null;
     }
 
     draw(ctx) {
@@ -19,10 +20,10 @@ class BattleTile {
 }
 
 class BattleMap {
-    constructor(width, height, units) {
+    constructor(width, height) {
         this.width = width;
         this.height = height;
-        this.units = units;
+        this.units = [];
         this.tile = [];
         for (var x=0; x<width; x++) {
             this.tile[x] = [];
@@ -45,6 +46,180 @@ class BattleMap {
             }
         }
     }
+
+    getUnit(x, y) {
+        if (this.tile[x] && this.tile[x][y]) {
+            return this.tile[x][y].unit;
+        }
+    }
+
+    addUnit(unit) {
+        this.units.push(unit);
+        this.tile[unit.x][unit.y].unit = unit;
+    }
+
+    moveUnit(unit, path) {
+        this.tile[unit.x][unit.y].unit = null;
+        unit.x = path[0].x;
+        unit.y = path[0].y;
+        this.tile[unit.x][unit.y].unit = unit;
+    }
+}
+
+function getBestMove(map) {
+    var moveList = this.getMoveList(map);
+    
+    var bestMove = moveList.sort(function(a, b) {
+        return b.score - a.score;
+    })[0];
+
+    return new BattleMove(this, bestMove);
+}
+
+function getMapNodes(map, startX, startY, range) {
+    var steps = 0;
+    var nodeList = [new Node(startX, startY, steps)];
+    var i = 0;
+    while (i < nodeList.length) {
+
+    }
+    return nodeList;
+}
+
+function getPath(map, startX, startY, range) {
+    var path = [];
+
+    path.push({
+        
+    });
+
+    return path;
+}
+    
+function getAllPaths(map, startX, startY, range) {
+    var paths = [];
+    //also record the light map
+    //also record whether or not the end is reachable
+    
+
+
+    paths.push({
+        path: getPath(map, startX, startY, range),
+        score: range //greater range -> path finding over multiple turns
+    });
+
+
+
+    return paths;
+}
+
+function createSpread(x, y, spread) {
+    var newspread = [];
+    spread.forEach(function(s) {
+        newspread.push({
+            x: s[0] + x,
+            y: s[1] + y
+        });
+    });
+    return newspread;
+}
+
+function createDiamond(x, y, range, center) {
+    var diamond = [];
+    for (var i=-range; i<=range; i++) {
+        for (var j=-range; j<=range; j++) {
+            if (!center && i == j) {
+                continue;
+            }
+            else if (Math.abs(i) + Math.abs(j) <= range) {
+                diamond.push({
+                    x: i + x,
+                    y: j + y
+                });
+            }
+        }
+    }
+    return diamond;
+}
+
+//todo: targets can also be tiles
+function getTargetList(map, spread) {
+    var targetList = [];
+    spread.forEach(function(s) {
+        var unit = map.getUnit(s.x, s.y);
+        if (unit) {
+            targetList.push(unit);
+        }
+    });
+    return targetList;
+}
+
+function getMoveList(map, unit) {
+    var moveList = [];
+    for (var x=0; x<8; x++) {
+        for (var y=0; y<8; y++) {
+            moveList.push({
+                start: {
+                    x: unit.x,
+                    y: unit.y
+                },
+                end: {
+                    x: x,
+                    y: y
+                },
+                path: [
+                    {
+                        x: x,
+                        y: y
+                    }
+                ]
+            });
+        }
+    }
+    return moveList;
+}
+
+//get the best action for a particular move case
+function getBestAction(map, unit, move) {
+    var actionList = [];
+
+    unit.actionList.forEach(function(a) {
+        var diamond = createDiamond(unit.x + move.end.x, unit.y + move.end.y, a.range, false);
+
+        diamond.forEach(function(d) {
+            var spread = createSpread(d.x, d.y, a.spread);
+            var targetList = getTargetList(map, spread);
+            actionList.push(new BattleAction(unit, move, a, d.x, d.y, spread, targetList));
+        });
+    });
+
+    actionList.sort(function(a, b) {
+        return b.score - a.score;
+    });
+
+    return actionList[0];
+}
+
+function getBestActionMove(map, unit) {
+    var moveList = getMoveList(map, unit);
+    var moveActionList = [];
+
+    moveList.forEach(function(m) {
+        moveActionList.push(getBestAction(map, unit, m));
+    });
+
+    moveActionList.sort(function(a, b) {
+        return b.score - a.score;
+    });
+
+    var bestActionMove = moveActionList[0];
+
+    if (bestActionMove.move.path.length > 0) { //if the unit must move first
+        return new ActionMove(unit, new BattleMove(unit, bestActionMove.move), bestActionMove);
+    }
+    else {
+        return new ActionMove(unit, bestActionMove, new BattleMove(unit, null));
+    }
 }
 
 class BattleUnit {
@@ -54,8 +229,10 @@ class BattleUnit {
         this.color = color;
         this.sprite = Math.floor(Math.random() * 90) + 10;
         this.at = 0;
+        this.hp = Math.floor(Math.random() * 25) + 50;
         this.agl = Math.floor(Math.random() * 5) + 1;
         this.actionmove = null;
+        this.actionList = [{ "name":"Bash", "range":1, "spread":[[0,0]] }];
         this.state = "";
     }
 
@@ -70,28 +247,9 @@ class BattleUnit {
         ctx.fillText(this.sprite, this.x * 60, this.y * 60);
     }
 
-    getBestAction(map) {
-        return new BattleAction(this, map.units);
-    }
-
-    getBestMove(map) {
-        return new BattleMove(this);
-    }
-
-    getBestActionMove(map) {
-        var targetList = [];
-
-        var actionmove;
-
-        if (Math.random() < 0.5) {
-            actionmove = new ActionMove(this.getBestAction(map), this.getBestMove(map));
-        }
-        else {
-            actionmove = new ActionMove(this.getBestMove(map), this.getBestAction(map));
-        }
-
-        //do ranking here
-        return actionmove;
+    applyDamage() {
+        this.hp -= 1;
+        console.log(this.sprite + " was damaged for " + 1 + " hp.");
     }
 
     done() {
@@ -112,18 +270,18 @@ class BattleParty {
 }
 
 class BattleMove {
-    constructor(unit) {
+    constructor(unit, move) {
         this.unit = unit;
-        this.move = {
-            x: Math.floor(Math.random() * 8),
-            y: Math.floor(Math.random() * 8)
-        };
+        this.move = move;
         this.ct = 0;
     }
 
-    invoke() {
-        this.unit.x = this.move.x;
-        this.unit.y = this.move.y;
+    invoke(map) {
+        if (!this.move) {
+            this.move = getBestMove(map, this.unit);
+        }
+
+        map.moveUnit(this.unit, this.move.path);
         this.unit.at -= 40;
     }
 
@@ -133,13 +291,22 @@ class BattleMove {
 }
 
 class BattleAction {
-    constructor(unit, targetList) {
+    constructor(unit, move, action, x, y, spread, targetList) {
         this.unit = unit;
+        this.move = move;
+        this.action = action;
+        this.x = x;
+        this.y = y;
+        this.spread = spread;
         this.targetList = targetList;
+        this.score = targetList.length;
         this.ct = Math.floor(Math.random() * 100) + 1;
     }
 
-    invoke() {
+    invoke(map) {
+        this.targetList.forEach(function(t) {
+            t.applyDamage();
+        });
         this.unit.state = "";
         this.unit.at -= 60;
     }
@@ -150,27 +317,23 @@ class BattleAction {
 }
 
 class ActionMove {
-    constructor(first, second) {
-        this.first = first;
-        this.second = second;
+    constructor(unit, first, second) {
+        this.unit = unit;
+        this.list = [first, second];
         this.score = 0;
     }
 
-    invokeFirst() {
-        this.first.invoke();
-    }
-
-    invokeSecond() {
-        this.second.invoke();
-    }
+    //invoke(map) {
+    //    this.shift(0).invoke(map);
+    //}
 }
 
 class Battle {
     constructor(party1, party2) {
+        this.map = new BattleMap(8, 8);
         this.units = [];
         this.addUnits(party1.units);
         this.addUnits(party2.units);
-        this.map = new BattleMap(8, 8, this.units);
         this.queue = [];
         this.log = "";
         this.nextAction = null;
@@ -184,7 +347,7 @@ class Battle {
         }
 
         if (this.nextAction) {
-            this.nextAction.invoke(); //update
+            this.nextAction.invoke(this.map); //update?
             this.nextAction = null;
         }
 
@@ -209,6 +372,9 @@ class Battle {
 
     addUnits(units) {
         this.units = this.units.concat(units);
+        units.forEach(function(u) {
+            this.map.addUnit(u);
+        }, this);
     }
 
     getNextActiveUnit() {
@@ -269,9 +435,9 @@ class Battle {
         if (!nextAction) {
             var nextUnit = this.getNextActiveUnit();
             if (nextUnit) {
-                var actionmove = nextUnit.getBestActionMove(this.map);
-                nextAction = actionmove.first;
-                this.queueActionMove(actionmove.second);
+                var actionMove = getBestActionMove(this.map, nextUnit);
+                this.queueActionMove(actionMove.list[0]);
+                this.queueActionMove(actionMove.list[1]);
             }
         }
 
