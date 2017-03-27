@@ -5,7 +5,7 @@
 
 <script>
 
-const INTERVAL = 100;
+const INTERVAL = 1;
 
 class BattleTile {
     constructor(x, y) {
@@ -88,11 +88,12 @@ class BattleMap {
 function getBestMove(map, unit) {
     var moveList = getMoveList(map, unit);
     
+    //for now the best action-less move is the one with the most steps
     var bestMove = moveList.sort(function(a, b) {
         return b.steps - a.steps;
     })[0];
 
-    return bestMove;
+    return new BattleMove(unit, bestMove);
 }
 
 function createBinaryMap(map, width, height) {
@@ -185,11 +186,11 @@ function createSpread(x, y, spread) {
     return newspread;
 }
 
-function createDiamond(x, y, range, center) {
+function createDiamond(x, y, range, includeCenter) {
     var diamond = [];
     for (var i=-range; i<=range; i++) {
         for (var j=-range; j<=range; j++) {
-            if (!center && i == j) {
+            if (!includeCenter && i == j) {
                 continue;
             }
             else if (Math.abs(i) + Math.abs(j) <= range) {
@@ -233,7 +234,7 @@ function getMoveList(map, unit) {
 
 //get the best action for a particular move case
 function getBestAction(map, unit, move) {
-    var actionList = [];
+    var actionList = [new DoNothing(map, unit)];
 
     unit.actionList.forEach(function(a) {
         var diamond = createDiamond(move.x, move.y, a.range, false);
@@ -294,6 +295,7 @@ class BattleUnit {
         this.state = "";
         this.moved = false;
         this.acted = false;
+        this.charging = false;
     }
 
     update() {
@@ -305,6 +307,11 @@ class BattleUnit {
         ctx.textBaseline = "top";
         ctx.font = "48px Arial";
         ctx.fillText(this.sprite, this.x * 60, this.y * 60);
+        if (this.charging) {
+            ctx.fillStyle = "rgba(255,255,255,1.0)";
+            ctx.font = "12px Arial";
+            ctx.fillText("Charging", this.x * 60, this.y * 60);
+        }
     }
 
     applyDamage() {
@@ -313,8 +320,14 @@ class BattleUnit {
     }
 
     done() {
+        if (this.moved && this.acted) { this.at = 0; }
+        else if (this.moved) { this.at = 20; }
+        else if (this.acted) { this.at = 20; }
+        else { this.at = 40; }
         this.moved = false;
         this.acted = false;
+        this.charging = false;
+        console.log(this.sprite + " is done");
     }
 
     toString() {
@@ -363,9 +376,6 @@ class BattleMove {
     }
 
     done() {
-        if (this.move.steps > 0) {
-            this.unit.at -= 40;
-        }
         this.unit.moved = true;
     }
 
@@ -385,8 +395,6 @@ class BattleAction {
         this.targetList = targetList;
         this.score = targetList.length;
         this.ct = Math.floor(Math.random() * 50) + 1;
-
-        //console.log("unit no. " + unit.sprite + " wants to move to x: " + move.x + "," + move.y + " and attack unit no. " + targetList[0].sprite);
     }
 
     invoke(map) {
@@ -395,9 +403,13 @@ class BattleAction {
         this.targetList.forEach(function(t) {
             t.applyDamage();
         });
-        this.unit.state = "";
-        this.unit.at -= 60;
+
+        this.done();
+    }
+
+    done() {
         this.unit.acted = true;
+        this.unit.charging = false;
     }
 
     toString() {
@@ -405,16 +417,71 @@ class BattleAction {
     }
 }
 
-class ActionMove {
-    constructor(unit, first, second) {
+class DoNothing {
+    constructor(map, unit) {
+        this.map = map;
         this.unit = unit;
-        this.list = [first, second];
         this.score = 0;
+        this.ct = 0;
     }
 
-    //invoke(map) {
-    //    this.shift(0).invoke(map);
-    //}
+    invoke(map) {
+        this.done();
+    }
+
+    done() {
+        this.unit.acted = true;
+    }
+
+    toString() {
+        return this.unit.sprite + " did nothing!";
+    }
+}
+
+function getNextActiveUnit(units) {
+    var nextUnit;
+
+    var availableUnits = units.filter(function(u) {
+        return !u.charging; //also check if alive
+    });
+
+    if (availableUnits.length == 0) {
+        return null;
+    }
+
+    availableUnits.sort(function(a, b) {
+        return b.at - a.at;
+    });
+    
+    availableUnits.some(function(u) {
+        if (u.at >= 100) {
+            nextUnit = u;
+            return true;
+        }
+    });
+
+    if (nextUnit) {
+        return nextUnit;
+    }
+
+    while (!nextUnit) {
+        availableUnits.forEach(function(u) {
+            u.at += u.agl;
+        });
+
+        availableUnits.sort(function(a, b) {
+            return b.at - a.at;
+        });
+
+        availableUnits.some(function(u) {
+            if (u.at >= 100) {
+                nextUnit = u;
+                return true;
+            }
+        });
+    }
+
+    return nextUnit;
 }
 
 class Battle {
@@ -429,15 +496,19 @@ class Battle {
     }
 
     update() {
-        this.log = "";
-
         if (!this.nextAction) {
-            this.nextAction = this.getNextAction();
+            this.nextAction = this.getNextAction(this.map);
         }
 
         if (this.nextAction) {
             this.nextAction = this.nextAction.invoke(this.map);
         }
+
+        this.log = "";
+
+        this.queue.forEach(function(q) {
+            this.log += q.toString() + "\n";
+        }, this);
 
         document.getElementById("log").innerHTML = this.log;
 
@@ -465,41 +536,7 @@ class Battle {
         }, this);
     }
 
-    getNextActiveUnit() {
-        var nextUnit;
-
-        this.units.forEach(function(u) {
-            if (u.at > 100) {
-                u.at = 100;
-                nextUnit = u;
-            }
-        });
-
-        if (nextUnit) {
-            return nextUnit;
-        }
-
-        var availableUnits = this.units.filter(function(u) {
-            return u.state == ""; //also check if alive
-        });
-
-        if (availableUnits.length == 0) {
-            return null;
-        }
-
-        while (!nextUnit) {
-            availableUnits.forEach(function(u) {
-                u.at += u.agl;
-                if (u.at >= 100) {
-                    nextUnit = u;
-                }
-            });
-        }
-
-        return nextUnit;
-    }
-
-    getNextAction() {
+    getNextAction(map) {
         var nextAction;
 
         if (this.queue.length > 0) {
@@ -511,20 +548,19 @@ class Battle {
                 return a.ct - b.ct;
             });
 
-            this.queue.forEach(function(q) {
-                this.log += q.toString() + "\n";
-            }, this);
-
             if (this.queue[0].ct <= 0) {
                 nextAction = this.queue.shift();
             }
         }
 
         if (!nextAction) {
-            var nextUnit = this.getNextActiveUnit();
+            var nextUnit = getNextActiveUnit(this.units);
             if (nextUnit) {
                 if (nextUnit.acted == false && nextUnit.moved == false) {
-                    var bestActionMove = getBestActionMove(this.map, nextUnit);
+                    var bestActionMove = getBestActionMove(map, nextUnit);
+                    //if (bestActionMove == null) {
+                    //    console.log("Error AAA", nextUnit);
+                    //}
                     if (bestActionMove.move.x == nextUnit.x && bestActionMove.move.y == nextUnit.y) { //no move
                         this.queueActionMove(bestActionMove);
                     }
@@ -534,10 +570,16 @@ class Battle {
                 }
                 else if (nextUnit.acted == true && nextUnit.moved == false) {
                     var bestMove = getBestMove(map, nextUnit);
+                    //if (bestMove == null) {
+                    //    console.log("Error BBB", nextUnit);
+                    //}
                     this.queueActionMove(bestMove);
                 }
                 else if (nextUnit.acted == false && nextUnit.moved == true) {
                     var bestAction = getBestAction(map, nextUnit, {x: nextUnit.x, y: nextUnit.y});
+                    //if (bestAction == null) {
+                    //    console.log("Error CCC", nextUnit);
+                    //}
                     this.queueActionMove(bestAction);
                 }
                 else {
@@ -551,7 +593,9 @@ class Battle {
     }
 
     queueActionMove(actionMove) {
-        actionMove.unit.state = "charging";
+        if (actionMove.ct > 0) {
+            actionMove.unit.charging = true;
+        }
         this.queue.push(actionMove);
     }
 }
