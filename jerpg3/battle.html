@@ -5,12 +5,24 @@
 
 <script>
 
+const INTERVAL = 100;
+
 class BattleTile {
     constructor(x, y) {
         this.x = x;
         this.y = y;
         this.color = "rgb(0,200,0)";
-        this.unit = null;
+        this.units = []; //[occupied unit, travelling unit]
+    }
+
+    addUnit(unit) {
+        this.units.push(unit);
+    }
+
+    removeUnit(unit) {
+        this.units = this.units.filter(function(u) {
+            return u.id != unit.id;
+        });
     }
 
     draw(ctx) {
@@ -23,7 +35,7 @@ class BattleMap {
     constructor(width, height) {
         this.width = width;
         this.height = height;
-        this.units = [];
+        //this.units = [];
         this.tile = [];
         for (var x=0; x<width; x++) {
             this.tile[x] = [];
@@ -45,72 +57,121 @@ class BattleMap {
                 this.tile[x][y].draw(ctx);
             }
         }
+
+        if (this.moveList) {
+            ctx.fillStyle = "rgba(255,0,255,0.5)";
+            this.moveList.forEach(function(m) {
+                ctx.fillRect(m.x * 60, m.y * 60, 59, 59);
+            });
+        }
     }
 
     getUnit(x, y) {
         if (this.tile[x] && this.tile[x][y]) {
-            return this.tile[x][y].unit;
+            return this.tile[x][y].units[0];
         }
     }
 
     addUnit(unit) {
-        this.units.push(unit);
-        this.tile[unit.x][unit.y].unit = unit;
+        //this.units.push(unit);
+        this.tile[unit.x][unit.y].addUnit(unit);
     }
 
-    moveUnit(unit, path) {
-        this.tile[unit.x][unit.y].unit = null;
-        unit.x = path[0].x;
-        unit.y = path[0].y;
-        this.tile[unit.x][unit.y].unit = unit;
+    moveUnit(unit, x, y) {
+        this.tile[unit.x][unit.y].removeUnit(unit);
+        unit.x = x;
+        unit.y = y;
+        this.tile[x][y].addUnit(unit);
     }
 }
 
-function getBestMove(map) {
-    var moveList = this.getMoveList(map);
+function getBestMove(map, unit) {
+    var moveList = getMoveList(map, unit);
     
     var bestMove = moveList.sort(function(a, b) {
-        return b.score - a.score;
+        return b.steps - a.steps;
     })[0];
 
-    return new BattleMove(this, bestMove);
+    return bestMove;
 }
 
-function getMapNodes(map, startX, startY, range) {
-    var steps = 0;
-    var nodeList = [new Node(startX, startY, steps)];
-    var i = 0;
-    while (i < nodeList.length) {
-
+function createBinaryMap(map, width, height) {
+    var bmap = [];
+    for (var x=0; x<width; x++) {
+        bmap[x] = [];
+        for (var y=0; y<height; y++) {
+            bmap[x][y] = 0;
+        }
     }
+    return bmap;
+}
+
+function getMapNodes(map, startX, startY, team) {
+    var binaryMap = createBinaryMap(map, 8, 8);
+    binaryMap[startX][startY] = 1;
+
+    var i = 0, steps = 0;
+    var xList = [0, -1, 0, 1];
+    var yList = [-1, 0, 1, 0];
+
+    var nodeList = [{
+        x: startX,
+        y: startY,
+        parent: null,
+        steps: 0
+    }];
+
+    while (i < nodeList.length) {
+        for (var j=0; j<4; j++) {
+
+            var x = nodeList[i].x + xList[j];
+            var y = nodeList[i].y + yList[j];
+
+            //if node is off the map
+            if (x < 0 || y < 0 || x >= map.width || y >= map.height) {
+                continue;
+            }
+
+            //if node has already been visited
+            if (binaryMap[x][y] === 1) {
+                continue;
+            }
+
+            var unit = map.tile[x][y].units[0];
+
+            //if unit exists on node and is enemy
+            if (unit && unit.team != team) {
+                //if enemy is not dead
+                if (unit.status != "dead") {
+                    continue;
+                }
+            }
+            
+            nodeList.push({
+                x: x,
+                y: y,
+                parent: nodeList[i],
+                steps: nodeList[i].steps + 1
+            });
+            binaryMap[x][y] = 1;
+        }
+        i++;
+    }
+
     return nodeList;
 }
 
-function getPath(map, startX, startY, range) {
+function getPath(move) {
     var path = [];
 
-    path.push({
-        
-    });
+    var node = move;
 
-    return path;
-}
-    
-function getAllPaths(map, startX, startY, range) {
-    var paths = [];
-    //also record the light map
-    //also record whether or not the end is reachable
-    
+    while (node) {
+        path.push(node);
+        node = node.parent;
+    }
 
-
-    paths.push({
-        path: getPath(map, startX, startY, range),
-        score: range //greater range -> path finding over multiple turns
-    });
-
-
-
-    return paths;
+    return path.reverse();
 }
 
 function createSpread(x, y, spread) {
@@ -143,39 +204,30 @@ function createDiamond(x, y, range, center) {
 }
 
 //todo: targets can also be tiles
-function getTargetList(map, spread) {
+function getTargetList(map, unit, move, spread) {
     var targetList = [];
     spread.forEach(function(s) {
-        var unit = map.getUnit(s.x, s.y);
-        if (unit) {
+        var mapunit = map.getUnit(s.x, s.y);
+        if (mapunit && mapunit.id != unit.id) { //do not target self based on map location
+            targetList.push(mapunit);
+        }
+        if (s.x == move.x && s.y == move.y) { //only target self in new move location
             targetList.push(unit);
         }
     });
     return targetList;
 }
 
+//gets list of possible move locations
 function getMoveList(map, unit) {
-    var moveList = [];
-    for (var x=0; x<8; x++) {
-        for (var y=0; y<8; y++) {
-            moveList.push({
-                start: {
-                    x: unit.x,
-                    y: unit.y
-                },
-                end: {
-                    x: x,
-                    y: y
-                },
-                path: [
-                    {
-                        x: x,
-                        y: y
-                    }
-                ]
-            });
-        }
-    }
+    var moveList = getMapNodes(map, unit.x, unit.y, unit.team);
+    
+    //filter out nodes that are occupied by any unit besides self
+    moveList = moveList.filter(function(n) {
+        var u = map.tile[n.x][n.y].units[0];
+        return !u || u.id == unit.id;
+    });
+
     return moveList;
 }
 
@@ -184,14 +236,18 @@ function getBestAction(map, unit, move) {
     var actionList = [];
 
     unit.actionList.forEach(function(a) {
-        var diamond = createDiamond(unit.x + move.end.x, unit.y + move.end.y, a.range, false);
+        var diamond = createDiamond(move.x, move.y, a.range, false);
 
         diamond.forEach(function(d) {
             var spread = createSpread(d.x, d.y, a.spread);
-            var targetList = getTargetList(map, spread);
-            actionList.push(new BattleAction(unit, move, a, d.x, d.y, spread, targetList));
+            var targetList = getTargetList(map, unit, move, spread);
+            if (targetList.length > 0) {
+                actionList.push(new BattleAction(unit, move, a, d.x, d.y, spread, targetList));
+            }
         });
     });
+
+    //calculate score here
 
     actionList.sort(function(a, b) {
         return b.score - a.score;
@@ -202,7 +258,13 @@ function getBestAction(map, unit, move) {
 
 function getBestActionMove(map, unit) {
     var moveList = getMoveList(map, unit);
+    map.moveList = moveList;
     var moveActionList = [];
+    var bestActionMove;
+
+    if (moveList.length == 0) {
+        console.error("moveList cannot be 0!");
+    }
 
     moveList.forEach(function(m) {
         moveActionList.push(getBestAction(map, unit, m));
@@ -212,28 +274,26 @@ function getBestActionMove(map, unit) {
         return b.score - a.score;
     });
 
-    var bestActionMove = moveActionList[0];
+    bestActionMove = moveActionList[0];
 
-    if (bestActionMove.move.path.length > 0) { //if the unit must move first
-        return new ActionMove(unit, new BattleMove(unit, bestActionMove.move), bestActionMove);
-    }
-    else {
-        return new ActionMove(unit, bestActionMove, new BattleMove(unit, null));
-    }
+    return bestActionMove;
 }
 
 class BattleUnit {
-    constructor(color) {
+    constructor(team) {
+        this.id = Math.floor(Math.random() * 100000000);
+        this.team = team;
         this.x = Math.floor(Math.random() * 8);
         this.y = Math.floor(Math.random() * 8);
-        this.color = color;
+        this.color = ["rgb(255,0,0)","rgb(0,255,0)"][team];
         this.sprite = Math.floor(Math.random() * 90) + 10;
         this.at = 0;
         this.hp = Math.floor(Math.random() * 25) + 50;
         this.agl = Math.floor(Math.random() * 5) + 1;
-        this.actionmove = null;
         this.actionList = [{ "name":"Bash", "range":1, "spread":[[0,0]] }];
         this.state = "";
+        this.moved = false;
+        this.acted = false;
     }
 
     update() {
@@ -253,17 +313,21 @@ class BattleUnit {
     }
 
     done() {
-        this.at = 0;
-        this.actionmove = null;
+        this.moved = false;
+        this.acted = false;
+    }
+
+    toString() {
+        return this.sprite + "(hp:" + this.hp + ")";
     }
 }
 
 class BattleParty {
-    constructor(color) {
+    constructor(team) {
         this.units = [];
-        this.color = color;
+        this.team = team;
         for (var i=0; i<5; i++) {
-            this.units.push(new BattleUnit(color));
+            this.units.push(new BattleUnit(team));
         }
         
     }
@@ -273,16 +337,36 @@ class BattleMove {
     constructor(unit, move) {
         this.unit = unit;
         this.move = move;
+        this.path = getPath(move);
         this.ct = 0;
     }
 
     invoke(map) {
-        if (!this.move) {
-            this.move = getBestMove(map, this.unit);
+        /*
+        if (!this.path) {
+            var mapList = getMapNodes(map, this.unit.x, this.unit.y, this.unit.team);
+            var bestMove = getBestMove(map, this.unit, mapList);
+            this.path = getPath([bestMove], bestMove.x, bestMove.y);
         }
+        */
 
-        map.moveUnit(this.unit, this.move.path);
-        this.unit.at -= 40;
+        var nextMove = this.path.shift();
+
+        if (nextMove) {
+            map.moveUnit(this.unit, nextMove.x, nextMove.y);
+            return this;
+        }
+        else {
+            this.done();
+            return false;
+        }
+    }
+
+    done() {
+        if (this.move.steps > 0) {
+            this.unit.at -= 40;
+        }
+        this.unit.moved = true;
     }
 
     toString() {
@@ -293,22 +377,27 @@ class BattleMove {
 class BattleAction {
     constructor(unit, move, action, x, y, spread, targetList) {
         this.unit = unit;
-        this.move = move;
+        this.move = move; //where the unit must be in order to complete the action
         this.action = action;
         this.x = x;
         this.y = y;
         this.spread = spread;
         this.targetList = targetList;
         this.score = targetList.length;
-        this.ct = Math.floor(Math.random() * 100) + 1;
+        this.ct = Math.floor(Math.random() * 50) + 1;
+
+        //console.log("unit no. " + unit.sprite + " wants to move to x: " + move.x + "," + move.y + " and attack unit no. " + targetList[0].sprite);
     }
 
     invoke(map) {
+        console.log(this.unit.toString() + " invoked an action.");
+
         this.targetList.forEach(function(t) {
             t.applyDamage();
         });
         this.unit.state = "";
         this.unit.at -= 60;
+        this.unit.acted = true;
     }
 
     toString() {
@@ -347,8 +436,7 @@ class Battle {
         }
 
         if (this.nextAction) {
-            this.nextAction.invoke(this.map); //update?
-            this.nextAction = null;
+            this.nextAction = this.nextAction.invoke(this.map);
         }
 
         document.getElementById("log").innerHTML = this.log;
@@ -435,18 +523,36 @@ class Battle {
         if (!nextAction) {
             var nextUnit = this.getNextActiveUnit();
             if (nextUnit) {
-                var actionMove = getBestActionMove(this.map, nextUnit);
-                this.queueActionMove(actionMove.list[0]);
-                this.queueActionMove(actionMove.list[1]);
+                if (nextUnit.acted == false && nextUnit.moved == false) {
+                    var bestActionMove = getBestActionMove(this.map, nextUnit);
+                    if (bestActionMove.move.x == nextUnit.x && bestActionMove.move.y == nextUnit.y) { //no move
+                        this.queueActionMove(bestActionMove);
+                    }
+                    else { //if unit has to move to carry out action
+                        this.queueActionMove(new BattleMove(nextUnit, bestActionMove.move))
+                    }
+                }
+                else if (nextUnit.acted == true && nextUnit.moved == false) {
+                    var bestMove = getBestMove(map, nextUnit);
+                    this.queueActionMove(bestMove);
+                }
+                else if (nextUnit.acted == false && nextUnit.moved == true) {
+                    var bestAction = getBestAction(map, nextUnit, {x: nextUnit.x, y: nextUnit.y});
+                    this.queueActionMove(bestAction);
+                }
+                else {
+                    nextUnit.done();
+                    nextAction = null;
+                }
             }
         }
 
         return nextAction;
     }
 
-    queueActionMove(s) {
-        s.unit.state = "charging";
-        this.queue.push(s);
+    queueActionMove(actionMove) {
+        actionMove.unit.state = "charging";
+        this.queue.push(actionMove);
     }
 }
 
@@ -454,7 +560,7 @@ var canvas, context, battle, lastTick;
 
 function loop() {
 
-    if (Date.now() > lastTick + 1000) {
+    if (Date.now() > lastTick + INTERVAL) {
         battle.update();
         draw();
         lastTick = Date.now();
@@ -471,8 +577,8 @@ window.onload = function() {
     canvas = document.getElementById("canvas");
     context = canvas.getContext("2d");
 
-    var party1 = new BattleParty("rgb(255,0,0)");
-    var party2 = new BattleParty("rgb(0,255,0)");
+    var party1 = new BattleParty(0);
+    var party2 = new BattleParty(1);
 
     battle = new Battle(party1, party2);
     lastTick = 0;
