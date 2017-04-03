@@ -5,7 +5,11 @@
 
 <script>
 
-const INTERVAL = 1;
+Array.prototype.popRandom = function() {
+    return this.splice(Math.floor(Math.random() * this.length), 1)[0];
+};
+
+const INTERVAL = 1000;
 
 class BattleTile {
     constructor(x, y) {
@@ -35,12 +39,19 @@ class BattleMap {
     constructor(width, height) {
         this.width = width;
         this.height = height;
-        //this.units = [];
         this.tile = [];
+        this.moveList = null;
         for (var x=0; x<width; x++) {
             this.tile[x] = [];
             for (var y=0; y<height; y++) {
                 this.tile[x][y] = new BattleTile(x, y);
+            }
+        }
+
+        this.openSpots = [];
+        for (var x=0; x<8; x++) {
+            for (var y=0; y<8; y++) {
+                this.openSpots.push({ x: x, y: y});
             }
         }
     }
@@ -59,8 +70,9 @@ class BattleMap {
         }
 
         if (this.moveList) {
-            ctx.fillStyle = "rgba(255,0,255,0.5)";
             this.moveList.forEach(function(m) {
+                var c = Math.floor(m.safetyScore * 255);
+                ctx.fillStyle = "rgba(0,0," + c + ",0.8)";
                 ctx.fillRect(m.x * 60, m.y * 60, 59, 59);
             });
         }
@@ -73,7 +85,12 @@ class BattleMap {
     }
 
     addUnit(unit) {
-        //this.units.push(unit);
+        if (unit.x == undefined || unit.y == undefined) {
+            var spot = this.openSpots.popRandom();
+            unit.x = spot.x;
+            unit.y = spot.y;
+        }
+
         this.tile[unit.x][unit.y].addUnit(unit);
     }
 
@@ -85,12 +102,42 @@ class BattleMap {
     }
 }
 
-function getBestMove(map, unit) {
-    var moveList = getMoveList(map, unit);
-    
-    //for now the best action-less move is the one with the most steps
+function getSafetyScore(map, units, unit, x, y) {
+    var safetyScore = 0;
+
+    //filter out self
+    var otherUnits = units.filter(function(u) {
+        return u.id != unit.id;
+    });
+
+    otherUnits.forEach(function(u) {
+        var dx = x - u.x;
+        var dy = y - u.y;
+        var distance = Math.sqrt(dx*dx + dy*dy);
+        if (distance == 0) { //this should never happen
+            return;
+        }
+        if (u.team == unit.team) {
+            safetyScore += (1 / distance);
+        }
+        else {
+            safetyScore -= (1 / distance);
+        }
+    });
+
+    safetyScore = safetyScore / otherUnits.length;
+
+    return safetyScore;
+}
+
+function getBestMove(map, units, unit) {
+    var moveList = getMoveList(map, units, unit);
+
+    //if healthy move towards closest enemy unit
+    //if near-death, run to safest spot
+
     var bestMove = moveList.sort(function(a, b) {
-        return b.steps - a.steps;
+        return b.score - a.score;
     })[0];
 
     return new BattleMove(unit, bestMove);
@@ -107,19 +154,21 @@ function createBinaryMap(map, width, height) {
     return bmap;
 }
 
-function getMapNodes(map, startX, startY, team) {
+function getMapNodes(map, units, unit) {
     var binaryMap = createBinaryMap(map, 8, 8);
-    binaryMap[startX][startY] = 1;
+    binaryMap[unit.x][unit.y] = 1;
 
     var i = 0, steps = 0;
     var xList = [0, -1, 0, 1];
     var yList = [-1, 0, 1, 0];
+    var minSafetyScore = 0, maxSafetyScore = 0;
 
     var nodeList = [{
-        x: startX,
-        y: startY,
+        x: unit.x,
+        y: unit.y,
         parent: null,
-        steps: 0
+        steps: 0,
+        safetyScore: 0
     }];
 
     while (i < nodeList.length) {
@@ -130,34 +179,44 @@ function getMapNodes(map, startX, startY, team) {
 
             //if node is off the map
             if (x < 0 || y < 0 || x >= map.width || y >= map.height) {
-                continue;
+                continue; //skip this node
             }
 
             //if node has already been visited
             if (binaryMap[x][y] === 1) {
-                continue;
+                continue; //skip this node
             }
 
-            var unit = map.tile[x][y].units[0];
+            var mapUnit = map.tile[x][y].units[0];
 
             //if unit exists on node and is enemy
-            if (unit && unit.team != team) {
+            if (mapUnit && mapUnit.team != unit.team) {
                 //if enemy is not dead
-                if (unit.status != "dead") {
-                    continue;
+                if (mapUnit.status != "dead") {
+                    continue; //skip this node
                 }
             }
-            
+
+            var safetyScore = getSafetyScore(map, units, unit, x, y);
+            minSafetyScore = safetyScore < minSafetyScore ? safetyScore : minSafetyScore;
+            maxSafetyScore = safetyScore > maxSafetyScore ? safetyScore : maxSafetyScore;
+
             nodeList.push({
                 x: x,
                 y: y,
                 parent: nodeList[i],
-                steps: nodeList[i].steps + 1
+                steps: nodeList[i].steps + 1,
+                safetyScore: safetyScore
             });
             binaryMap[x][y] = 1;
         }
         i++;
     }
+
+    //normalize safety scores
+    nodeList.forEach(function(node) {
+        node.safetyScore = (node.safetyScore - minSafetyScore) / (maxSafetyScore - minSafetyScore);
+    });
 
     return nodeList;
 }
@@ -220,8 +279,8 @@ function getTargetList(map, unit, move, spread) {
 }
 
 //gets list of possible move locations
-function getMoveList(map, unit) {
-    var moveList = getMapNodes(map, unit.x, unit.y, unit.team);
+function getMoveList(map, units, unit) {
+    var moveList = getMapNodes(map, units, unit);
     
     //filter out nodes that are occupied by any unit besides self
     moveList = moveList.filter(function(n) {
@@ -233,7 +292,7 @@ function getMoveList(map, unit) {
 }
 
 //get the best action for a particular move case
-function getBestAction(map, unit, move) {
+function getBestAction(map, units, unit, move) {
     var actionList = [new DoNothing(map, unit)];
 
     unit.actionList.forEach(function(a) {
@@ -257,8 +316,8 @@ function getBestAction(map, unit, move) {
     return actionList[0];
 }
 
-function getBestActionMove(map, unit) {
-    var moveList = getMoveList(map, unit);
+function getBestActionMove(map, units, unit) {
+    var moveList = getMoveList(map, units, unit);
     map.moveList = moveList;
     var moveActionList = [];
     var bestActionMove;
@@ -268,7 +327,7 @@ function getBestActionMove(map, unit) {
     }
 
     moveList.forEach(function(m) {
-        moveActionList.push(getBestAction(map, unit, m));
+        moveActionList.push(getBestAction(map, units, unit, m));
     });
 
     moveActionList.sort(function(a, b) {
@@ -284,8 +343,6 @@ class BattleUnit {
     constructor(team) {
         this.id = Math.floor(Math.random() * 100000000);
         this.team = team;
-        this.x = Math.floor(Math.random() * 8);
-        this.y = Math.floor(Math.random() * 8);
         this.color = ["rgb(255,0,0)","rgb(0,255,0)"][team];
         this.sprite = Math.floor(Math.random() * 90) + 10;
         this.at = 0;
@@ -296,6 +353,10 @@ class BattleUnit {
         this.moved = false;
         this.acted = false;
         this.charging = false;
+        this.targetList = [];
+
+        this.x = undefined;
+        this.y = undefined;
     }
 
     update() {
@@ -303,14 +364,29 @@ class BattleUnit {
     }
 
     draw(ctx) {
+        var dx = this.x * 60;
+        var dy = this.y * 60;
+
         ctx.fillStyle = this.color;
         ctx.textBaseline = "top";
         ctx.font = "48px Arial";
-        ctx.fillText(this.sprite, this.x * 60, this.y * 60);
+        ctx.fillText(this.sprite, dx, dy);
+
+        ctx.strokeStyle = "rgb(255,255,0)";
+        ctx.lineWidth = 2;
+        if (this.targetList) {
+            this.targetList.forEach(function(t) {
+                ctx.beginPath();
+                ctx.moveTo(dx+30, dy+30);
+                ctx.lineTo(t.x*60+30,t.y*60+30);
+                ctx.stroke();
+            });
+        }
+
         if (this.charging) {
             ctx.fillStyle = "rgba(255,255,255,1.0)";
             ctx.font = "12px Arial";
-            ctx.fillText("Charging", this.x * 60, this.y * 60);
+            ctx.fillText("Charging", dx, dy);
         }
     }
 
@@ -393,8 +469,9 @@ class BattleAction {
         this.y = y;
         this.spread = spread;
         this.targetList = targetList;
-        this.score = targetList.length;
         this.ct = Math.floor(Math.random() * 50) + 1;
+
+        this.score = targetList.length + move.safetyScore;
     }
 
     invoke(map) {
@@ -484,6 +561,73 @@ function getNextActiveUnit(units) {
     return nextUnit;
 }
 
+function getNextAction(battle, units) {
+    var nextAction;
+
+    if (battle.queue.length > 0) {
+        battle.queue.forEach(function(q) {
+            q.ct = q.ct - 1;
+        });
+
+        battle.queue.sort(function(a,b) {
+            return a.ct - b.ct;
+        });
+
+        if (battle.queue[0].ct <= 0) {
+            nextAction = battle.queue.shift();
+        }
+    }
+
+    if (!nextAction) {
+        var nextUnit = getNextActiveUnit(units);
+        if (nextUnit) {
+            if (nextUnit.acted == false && nextUnit.moved == false) { //case A
+                var bestActionMove = getBestActionMove(battle.map, units, nextUnit);
+                //if (bestActionMove == null) {
+                //    console.log("Error AAA", nextUnit);
+                //}
+
+                //if unit does not need to move to act
+                if (bestActionMove.move.x == nextUnit.x && bestActionMove.move.y == nextUnit.y) {
+                    battle.queueActionMove(bestActionMove); //queue the action
+                }
+                else { //if unit has to move to carry out action
+                    battle.queueActionMove(new BattleMove(nextUnit, bestActionMove.move)); //queue the move
+                }
+            }
+            else if (nextUnit.acted == true && nextUnit.moved == false) { //case B
+                var bestMove = getBestMove(battle.map, units, nextUnit);
+                //if (bestMove == null) {
+                //    console.log("Error BBB", nextUnit);
+                //}
+                battle.queueActionMove(bestMove);
+            }
+            else if (nextUnit.acted == false && nextUnit.moved == true) { //case C
+                var node = {
+                    x: nextUnit.x,
+                    y: nextUnit.y,
+                    parent: null,
+                    steps: 0,
+                    safetyScore: getSafetyScore(battle.map, units, nextUnit, nextUnit.x, nextUnit.y)
+                };
+
+                //the hope is that this action is the same one calculated in case A afte the move is done
+                var bestAction = getBestAction(battle.map, units, nextUnit, node);
+                //if (bestAction == null) {
+                //    console.log("Error CCC", nextUnit);
+                //}
+                battle.queueActionMove(bestAction);
+            }
+            else { //case D
+                nextUnit.done();
+                nextAction = null;
+            }
+        }
+    }
+
+    return nextAction;
+}
+
 class Battle {
     constructor(party1, party2) {
         this.map = new BattleMap(8, 8);
@@ -497,7 +641,7 @@ class Battle {
 
     update() {
         if (!this.nextAction) {
-            this.nextAction = this.getNextAction(this.map);
+            this.nextAction = getNextAction(this, this.units);
         }
 
         if (this.nextAction) {
@@ -536,66 +680,15 @@ class Battle {
         }, this);
     }
 
-    getNextAction(map) {
-        var nextAction;
-
-        if (this.queue.length > 0) {
-            this.queue.forEach(function(q) {
-                q.ct = q.ct - 1;
-            }, this);
-
-            this.queue.sort(function(a,b) {
-                return a.ct - b.ct;
-            });
-
-            if (this.queue[0].ct <= 0) {
-                nextAction = this.queue.shift();
-            }
-        }
-
-        if (!nextAction) {
-            var nextUnit = getNextActiveUnit(this.units);
-            if (nextUnit) {
-                if (nextUnit.acted == false && nextUnit.moved == false) {
-                    var bestActionMove = getBestActionMove(map, nextUnit);
-                    //if (bestActionMove == null) {
-                    //    console.log("Error AAA", nextUnit);
-                    //}
-                    if (bestActionMove.move.x == nextUnit.x && bestActionMove.move.y == nextUnit.y) { //no move
-                        this.queueActionMove(bestActionMove);
-                    }
-                    else { //if unit has to move to carry out action
-                        this.queueActionMove(new BattleMove(nextUnit, bestActionMove.move))
-                    }
-                }
-                else if (nextUnit.acted == true && nextUnit.moved == false) {
-                    var bestMove = getBestMove(map, nextUnit);
-                    //if (bestMove == null) {
-                    //    console.log("Error BBB", nextUnit);
-                    //}
-                    this.queueActionMove(bestMove);
-                }
-                else if (nextUnit.acted == false && nextUnit.moved == true) {
-                    var bestAction = getBestAction(map, nextUnit, {x: nextUnit.x, y: nextUnit.y});
-                    //if (bestAction == null) {
-                    //    console.log("Error CCC", nextUnit);
-                    //}
-                    this.queueActionMove(bestAction);
-                }
-                else {
-                    nextUnit.done();
-                    nextAction = null;
-                }
-            }
-        }
-
-        return nextAction;
-    }
-
     queueActionMove(actionMove) {
         if (actionMove.ct > 0) {
             actionMove.unit.charging = true;
         }
+
+        if (actionMove.targetList) {
+            actionMove.unit.targetList = actionMove.targetList;
+        }
+
         this.queue.push(actionMove);
     }
 }

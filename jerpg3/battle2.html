@@ -1,0 +1,396 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var INTERVAL = 100;
+
+function getBestMove(battle, unit) {
+    var newMove = new BattleMove(battle, unit);
+
+    //check to make sure move won't interfere with charging action
+
+    return newMove;
+}
+
+function getBestAction(battle, unit, node) {
+    var newAction = new BattleAction(battle, unit);
+
+    //a currently charging action when re-scored should sort favourably
+    // causing the unit to choose to wait
+
+    return newAction;
+}
+
+function getBestActionAndMove(battle, unit) {
+    var newAction = new BattleAction(battle, unit);
+
+    return newAction;
+}
+
+function generateTiles(width, height) {
+    var tiles = [];
+    for (var x=0; x<width; x++) {
+        tiles[x] = [];
+        for (var y=0; y<height; y++) {
+            tiles[x][y] = new Tile(x, y, "grass");
+        }
+    }
+    return tiles;
+}
+
+class Tile {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+        this.units = [];
+    }
+
+    addUnit(unit) {
+        this.units.push(unit);
+    }
+
+    removeUnit(unit) {
+        this.units = this.units.filter(function(u) {
+            return u.id !== unit.id;
+        });
+    }
+}
+
+class Node {
+    constructor(x, y, steps, parent) {
+        this.x = x;
+        this.y = y;
+        this.steps = steps;
+        this.parent = parent;
+    }
+
+    toString() {
+        return "(" + this.x + ", " + this.y + ")";
+    }
+}
+
+class BattleQueue {
+    constructor(units) {
+        this.list = [];
+        this.buffer = [];
+
+        units.forEach(function(u) {
+            this.list.push(u);
+        }, this);
+    }
+
+    tick() {
+        this.list = this.list.filter(function(item) {
+            return !item.remove;
+        });
+
+        this.sort();
+
+        if (this.list[0].ready) {
+            return this.list[0];
+        }
+
+        this.list.forEach(function(item) {
+            item.tick();
+        });
+
+        return null;
+    }
+
+    add(item) {
+        this.list.push(item);
+        this.sort();
+    }
+
+    sort() {
+        this.list.sort(function(a, b) {
+            if (a.ctr < b.ctr) return -1;
+            if (a.ctr > b.ctr) return 1;
+            if (a.priority > b.priority) return -1;
+            if (a.priority < b.priority) return 1;
+            if (a.id < b.id) return -1;
+            if (a.id > b.id) return 1;
+            return 0; //this should never happen
+        });
+    }
+
+    toString() {
+        var outputText = "";
+        this.list.forEach(function(item) {
+            outputText += item.toString() + "\n";
+        });
+        return outputText;
+    }
+}
+
+class BattleUnit {
+    constructor(team) {
+        this.id = Math.floor(Math.random() * 10000000);
+        this.team = team;
+        this.sprite = Math.floor(Math.random() * 90) + 10;
+        this.color = ["rgb(255,0,0)", "rgb(0,255,0)"][team];
+        this.x = Math.floor(Math.random() * 8),
+        this.y = Math.floor(Math.random() * 8),
+        this.ct = 100;
+        this.ctr = 0;
+        this.agl = Math.floor(Math.random() * 5) + 5;
+        this.actionmove = null;
+        this.priority = 0; //actions and moves go before unit turns
+        this.ready = this.ctr === 0;
+        this.moved = false;
+        this.acted = false;
+    }
+
+    tick() {
+        this.ctr -= 1;
+        if (this.ctr <= 0) {
+            this.ctr = 0;
+            this.ready = true;
+        }
+    }
+
+    invoke(battle) {
+        if (this.actionmove) { //unit is already charging
+            console.log("Unit No. " + this.actionmove.unit.sprite + " is already preparing to act.");
+        }
+        else {
+            if (!this.moved && !this.acted) {
+                this.actionmove = getBestActionAndMove(battle, this);
+            }
+            else if (this.acted && !this.moved) {
+                this.actionmove = getBestMove(battle, this);
+            }
+            else if (!this.acted && this.moved) {
+                this.actionmove = getBestAction(battle, this);
+            }
+            else {
+                this.actionmove = new DoNothing();
+            }
+            battle.queue.add(this.actionmove);
+        }
+        this.done();
+        return null;
+    }
+
+    done() {
+        if (this.moved && this.acted) {
+            this.ct = 100;
+        }
+        else if (this.moved) {
+            this.ct = 80;
+        }
+        else if (this.acted) {
+            this.ct = 80;
+        }
+        else {
+            this.ct = 60;
+        }
+        this.ctr = Math.ceil(this.ct / this.agl);
+        this.ready = false;
+    }
+
+    draw(ctx) {
+        var dx = this.x * 60;
+        var dy = this.y * 60;
+        ctx.font = "50px Arial";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = this.color;
+        ctx.fillText(this.sprite, dx, dy);
+    }
+
+    toString() {
+        return "Unit No. " + this.sprite + " - CTR: " + this.ctr + ", Ready: " + this.ready;
+    }
+}
+
+class BattleMove {
+    constructor(battle, unit, node) {
+        this.unit = unit;
+        this.node = node;
+        this.ctr = 0;
+        this.priority = 1;
+        this.ready = true;
+        this.remove = false;
+    }
+
+    invoke() {
+        battle.map.moveUnit(unit, this.node);
+        return null;
+    }
+
+    done() {
+        console.log("Unit No. " + this.unit.sprite + " moved to " + this.node.toString());
+        this.remove = true;
+        this.unit.actionmove = null;
+    }
+}
+
+class BattleAction {
+    constructor(battle, unit, node) {
+        this.type = "bash";
+        this.unit = unit;
+        this.ctr = Math.floor(Math.random() * 20);
+        this.priority = 1;
+        this.ready = this.ctr === 0;
+        this.remove = false;
+    }
+
+    tick() {
+        this.ctr -= 1;
+        if (this.ctr <= 0) {
+            this.ctr = 0;
+            this.ready = true;
+        }
+    }
+
+    invoke() {
+        this.done();
+        return null;
+    }
+
+    done() {
+        console.log("Unit No. " + this.unit.sprite + " used " + this.type);
+        this.remove = true;
+        this.unit.actionmove = null;
+    }
+
+    toString() {
+        return "Action - Type: " + this.type + ", Unit No. " + this.unit.sprite + ", - CTR: " + this.ctr  + ", Ready: " + this.ready;
+    }
+}
+
+class DoNothing {
+    constructor(battle, unit) {
+        this.ctr = 0;
+        this.ready = true;
+    }
+
+    invoke() {
+        this.done();
+        this.unit.actionmove = null;
+        return null;
+    }
+
+    done() {
+        console.log("Unit No. " + this.unit.sprite + " did nothing...");
+    }
+
+    toString() {
+        return "Unit No. " + this.unit.sprite + ", - CTR: " + this.ctr  + ", Ready: " + this.ready;
+    }
+}
+
+class GameBattle {
+    constructor() {
+        this.units = [
+            new BattleUnit(0),
+            new BattleUnit(0),
+            new BattleUnit(0),
+            new BattleUnit(0),
+            new BattleUnit(1),
+            new BattleUnit(1),
+            new BattleUnit(1),
+            new BattleUnit(1),
+        ];
+        this.queue = new BattleQueue(this.units);
+        this.activeItem = null;
+
+        this.tile = generateTiles(8, 8);
+    }
+
+    start() {
+        this.units.forEach(function(u) {
+            u.done();
+        });
+    }
+
+    update() {
+        
+        if (this.activeItem) {
+            this.activeItem = this.activeItem.invoke(this);
+            this.queue.sort();
+        }
+        else {
+            this.activeItem = this.queue.tick();
+        }
+
+        output.value = this.queue.toString();
+    }
+
+    moveUnit(unit, node) {
+        this.tile[unit.x][unit.y].removeUnit(unit);
+        unit.x = node.x;
+        unit.y = node.y;
+        this.tile[unit.x][unit.y].addUnit(unit);
+    }
+
+    draw(ctx) {
+        ctx.clearRect(0, 0, 640, 480);
+        for (var x=0; x<8; x++) {
+            for (var y=0; y<8; y++) {
+                ctx.fillStyle = "rgb(0,150,50)";
+                ctx.fillRect(x * 60, y * 60, 59, 59);
+            }
+        }
+
+        this.units.forEach(function(u) {
+            u.draw(ctx);
+        });
+    }
+}
+
+var canvas, context;
+var output;
+var battle;
+var lasttick = 0;
+
+function update() {
+    if (Date.now() > lasttick + INTERVAL) {
+        battle.update();
+        lasttick = Date.now();
+    }
+    draw();
+    //window.requestAnimationFrame(update);
+}
+
+function draw() {
+    battle.draw(context);
+}
+
+function init() {
+    battle = new GameBattle();
+    battle.start();
+
+    var b = document.getElementById("nexttick");
+    b.onclick = function() {
+        update();
+    };
+
+    //update();
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    output = document.getElementById("output");
+    init();  
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+<textarea id="output" cols="80" rows="20"></textarea>
+<button id="nexttick">Next</button>
+
+</body>
+
+</html>
