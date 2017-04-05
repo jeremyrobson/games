@@ -3,31 +3,29 @@
 
 <head>
 
+<script src="movement.js"></script>
 <script>
 
 var INTERVAL = 100;
 
 function getBestMove(battle, unit) {
-    var newMove = new BattleMove(battle, unit);
+    var bestMove = new BattleMove(battle, unit);
+
+    var moveList = getMoveList(battle.map, battle.units, unit);
 
     //check to make sure move won't interfere with charging action
 
-    return newMove;
-}
+    //each possible move is scored based on safety, steps
+    //if a unit has not acted yet, the safety scores are halved
+    //if a unit has acted, the safety scores are doubled
+    //number of steps/10 increases score
+    //if the unit is charging a sticky action, no change in score
+    //if the unit is charging a non-sticky action, add resulting damage to score
+    //if the unit is beign targeted by a tile-based action, calculate the consequences of moving
+    //if the unit is being targetd by a unit-based action, also calculate the consequences of moving
+    //(for example, moving next to the caster or other units might be beneficial)
 
-function getBestAction(battle, unit, node) {
-    var newAction = new BattleAction(battle, unit);
-
-    //a currently charging action when re-scored should sort favourably
-    // causing the unit to choose to wait
-
-    return newAction;
-}
-
-function getBestActionAndMove(battle, unit) {
-    var newAction = new BattleAction(battle, unit);
-
-    return newAction;
+    return bestMove;
 }
 
 function generateTiles(width, height) {
@@ -58,18 +56,9 @@ class Tile {
             return u.id !== unit.id;
         });
     }
-}
 
-class Node {
-    constructor(x, y, steps, parent) {
-        this.x = x;
-        this.y = y;
-        this.steps = steps;
-        this.parent = parent;
-    }
-
-    toString() {
-        return "(" + this.x + ", " + this.y + ")";
+    getUnits() {
+        return this.units;
     }
 }
 
@@ -159,7 +148,7 @@ class BattleUnit {
         }
         else {
             if (!this.moved && !this.acted) {
-                this.actionmove = getBestActionAndMove(battle, this);
+                this.actionmove = getBestActionOrMove(battle, this);
             }
             else if (this.acted && !this.moved) {
                 this.actionmove = getBestMove(battle, this);
@@ -225,18 +214,22 @@ class BattleMove {
     done() {
         console.log("Unit No. " + this.unit.sprite + " moved to " + this.node.toString());
         this.remove = true;
+        this.unit.moved = true;
         this.unit.actionmove = null;
     }
 }
 
 class BattleAction {
-    constructor(battle, unit, node) {
-        this.type = "bash";
+    constructor(battle, unit, actionType, target) {
+        this.type = actionType;
         this.unit = unit;
         this.ctr = Math.floor(Math.random() * 20);
         this.priority = 1;
         this.ready = this.ctr === 0;
         this.remove = false;
+        this.pda = false; //position-dependent action
+        this.sticky = false; //might not need this due to target property
+        this.target = target; //either a unit or tile
     }
 
     tick() {
@@ -255,6 +248,7 @@ class BattleAction {
     done() {
         console.log("Unit No. " + this.unit.sprite + " used " + this.type);
         this.remove = true;
+        this.unit.acted = true;
         this.unit.actionmove = null;
     }
 
