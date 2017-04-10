@@ -1,3 +1,12 @@
+function listHasPoint(list, x, y) {
+    for (var p = 0; p < list.length; p++) {
+        if (list[p].x === x && list[p].y === y) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class MoveNode {
     constructor(x, y, steps, parent, safetyScore) {
         this.x = x;
@@ -12,7 +21,7 @@ class MoveNode {
     }
 }
 
-function getSafetyScore(map, units, unit, x, y) {
+function getSafetyScore(battle, units, unit, x, y) {
     var safetyScore = 0;
 
     //filter out self
@@ -35,7 +44,22 @@ function getSafetyScore(map, units, unit, x, y) {
         }
     });
 
-    safetyScore = safetyScore / otherUnits.length;
+    //check queue for future action spreads that hit this tile
+    var actions = battle.queue.getActions(x, y, 10);
+    actions.forEach(function(action) {
+        // "what if" the unit moved to the proposed x,y?
+        var damage = action.getDamage(unit);
+        if (damage > 0) { //unit would be damaged
+            safetyScore -= 1;
+        }
+        if (unit.hp - damage < 0) { //unit would be killed
+            safetyScore -= 2;
+        }
+        if (damage < 0) { //unit would be healed
+            safetyScore += 1;
+        }
+        
+    });
 
     return safetyScore;
 }
@@ -120,14 +144,47 @@ function getPath(move) {
     return path.reverse();
 }
 
+class BattleMove {
+    constructor(unit, node) {
+        this.unit = unit;
+        this.node = node;
+        this.ctr = 0;
+        this.ready = false;
+        this.priority = 1;
+        this.remove = false;
+    }
+
+    tick() {
+        this.ctr -= 1;
+        if (this.ctr <= 0) {
+            this.ctr = 0;
+            this.ready = true;
+        }
+    }
+
+    invoke(battle) {
+        battle.moveUnit(this.unit, this.node);
+        this.done();
+        return null;
+    }
+
+    done() {
+        this.remove = true;
+    }
+
+    toString() {
+        return "Move - Unit No. " + this.unit.sprite + " - CTR: " + this.ctr + ", Node: " + this.node.x + ", " + this.node.y;
+    }
+}
+
 function getBestMove(battle, unit) {
     var bestMove = null;
-
-    console.log(battle, unit);
 
     var mapNodes = getMapNodes(battle, battle.units, unit);
 
     battle.mapNodes = mapNodes;
+
+    bestMove = new BattleMove(unit, new MoveNode(0, 0, 0, null, 0));
 
     return bestMove;
 }

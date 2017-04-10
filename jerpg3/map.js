@@ -34,12 +34,3 @@ class Tile {
         return this.units;
     }
 }
-
-function getBestMove(battle, unit) {
-    var bestMove = null;
-    var mapNodes = getMapNodes(battle, battle.units, unit)
-
-    battle
-
-    return bestMove;
-}

@@ -43,6 +43,14 @@ class BattleQueue {
         });
     }
 
+    getActions(x, y, ctr) {
+        return this.list.filter(function(item) {
+            return item instanceof BattleAction && 
+                item.ctr <= ctr &&
+                listHasPoint(item.spread, x, y);
+        });
+    }
+
     toString() {
         var outputText = "";
         this.list.forEach(function(item) {
@@ -60,8 +68,8 @@ class BattleUnit {
         this.color = ["rgb(255,0,0)", "rgb(0,255,0)"][team];
         this.x = Math.floor(Math.random() * MAP_WIDTH),
         this.y = Math.floor(Math.random() * MAP_HEIGHT),
-        this.ct = 100;
-        this.ctr = 0;
+        this.ct = 100; //CT divided by AGL gives CTR
+        this.ctr = 0; //unit turn when CTR = 0
         this.agl = Math.floor(Math.random() * 5) + 5;
         this.actionmove = null;
         this.priority = 0; //actions and moves go before unit turns
@@ -85,6 +93,9 @@ class BattleUnit {
             console.log("Unit No. " + this.actionmove.unit.sprite + " is already preparing to act.");
         }
         else {
+            var a = getBestAction(battle, this);
+            battle.queue.add(a);
+
             if (!this.moved && !this.acted) {
                 this.actionmove = getBestMove(battle, this);
             }
@@ -182,7 +193,9 @@ class GameBattle {
         }
 
         this.mapNodes.forEach(function(node) {
-            ctx.fillStyle = "rgba(255,0,0," + node.safetyScore + ")";
+            var r = Math.floor(255 * (1 - node.safetyScore));
+            var b = Math.floor(255 * node.safetyScore);
+            ctx.fillStyle = "rgb(" + r + ",0," + b + ")";
             ctx.fillRect(node.x * TILE_WIDTH, node.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
         });
 
