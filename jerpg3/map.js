@@ -25,6 +25,7 @@ class Tile {
     }
 
     removeUnit(unit) {
+        //todo: speed up using indexing
         this.units = this.units.filter(function(u) {
             return u.id !== unit.id;
         });
@@ -32,5 +33,9 @@ class Tile {
 
     getUnits() {
         return this.units;
+    }
+
+    toString() {
+        return "X: " + this.x + ", Y: " + this.y + ", Units: " + this.units.length;
     }
 }

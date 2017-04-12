@@ -248,7 +248,6 @@ class BattleAction {
     done() {
         console.log("Unit No. " + this.unit.sprite + " used " + this.type);
         this.remove = true;
-        this.unit.acted = true;
         this.unit.actionmove = null;
     }
 

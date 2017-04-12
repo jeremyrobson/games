@@ -50,7 +50,7 @@ function getTargetList(map, unit, move, spread) {
 class BattleAction {
     constructor(battle, unit, action, x, y, node) {
         this.unit = unit;
-        this.ctr = actions[action].ctr;
+        this.ctr = Math.floor(Math.random() * 20); //actions[action].ctr;
         this.range = actions[action].range;
         this.spread = getSpread(x, y, actions[action]);
         this.x = x;
@@ -80,8 +80,16 @@ class BattleAction {
         this.unit.actionmove = null;
     }
 
+    draw(ctx) {
+
+    }
+
     getDamage(target) {
         return Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 2;
+    }
+
+    mustMoveFirst() {
+        return (!(this.unit.x === this.node.x && this.unit.y === this.node.y));
     }
 
     toString() {
@@ -89,10 +97,55 @@ class BattleAction {
     }
 }
 
+class DoNothing {
+    constructor(battle, unit) {
+        this.unit = unit;
+        this.ctr = 0;
+        this.ready = true;
+    }
+
+    tick() {
+        console.log("do nothing tick");
+    }
+
+    invoke() {
+        this.done();
+        this.unit.actionmove = null;
+        return null;
+    }
+
+    done() {
+        console.log("Unit No. " + this.unit.sprite + " did nothing...");
+    }
+
+    draw(ctx) {
+
+    }
+
+    toString() {
+        return "Unit No. " + this.unit.sprite + ", - CTR: " + this.ctr  + ", Ready: " + this.ready;
+    }
+}
+
 function getBestAction(battle, unit) {
     var bestAction = null;
 
-    bestAction = new BattleAction(battle, unit, "bash", 5, 5, new MoveNode(0, 0, 0, 0, 0));
+    var mapNodes = getMapNodes(battle, battle.units, unit);
+
+    mapNodes.sort(function(a, b) { //most dangerous
+        return a.safetyScore - b.safetyScore;
+    });
+
+    battle.mapNodes = mapNodes;
+
+    bestAction = new BattleAction(
+        battle,
+        unit,
+        "bash",
+        Math.floor(Math.random() * 16),
+        Math.floor(Math.random() * 16),
+        mapNodes[0]
+    );
 
     return bestAction;
 }

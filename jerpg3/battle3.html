@@ -27,6 +27,15 @@ function draw() {
 
 function init() {
     battle = new GameBattle();
+    battle.addUnit(new BattleUnit(0, "bash"));
+    battle.addUnit(new BattleUnit(0, "bash"));
+    battle.addUnit(new BattleUnit(0, "bash"));
+    battle.addUnit(new BattleUnit(0, "bash"));
+    battle.addUnit(new BattleUnit(1, "bash"));
+    battle.addUnit(new BattleUnit(1, "bash"));
+    battle.addUnit(new BattleUnit(1, "bash"));
+    battle.addUnit(new BattleUnit(1, "bash"));
+
     battle.start();
 
     var b = document.getElementById("nexttick");

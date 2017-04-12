@@ -1,11 +1,7 @@
 class BattleQueue {
-    constructor(units) {
+    constructor() {
         this.list = [];
         this.buffer = [];
-
-        units.forEach(function(u) {
-            this.list.push(u);
-        }, this);
     }
 
     tick() {
@@ -89,20 +85,55 @@ class BattleUnit {
     }
 
     invoke(battle) {
-        if (this.actionmove) { //unit is already charging
-            console.log("Unit No. " + this.actionmove.unit.sprite + " is already preparing to act.");
+        if (!this.moved && !this.acted) {
+            if (this.actionmove) {
+                console.log("Unit No. " + this.actionmove.unit.sprite + " is already preparing to act.");
+                //todo: if action is sticky, allow movement
+                this.acted = true;
+            }
+            else {
+                var bestAction = getBestAction(battle, this);
+                if (bestAction.mustMoveFirst()) {
+                    var requiredMove = new BattleMove(
+                        this,
+                        bestAction.node
+                    );
+                    battle.queue.add(requiredMove);
+                    this.moved = true;
+                }
+                else {
+                    battle.queue.add(bestAction);
+                    this.actionmove = bestAction;
+                    this.acted = true;
+                }
+            }
+        }
+        else if (this.acted && !this.moved) {
+            var bestMove = getBestMove(battle, this);
+            battle.queue.add(bestMove);
+            this.done();
+            return null;
+        }
+        else if (!this.acted && this.moved) {
+            if (this.actionmove) {
+                console.log("I SAID Unit No. " + this.actionmove.unit.sprite + " is already preparing to act!!!");
+            }
+            else {
+                var bestAction = getBestAction(battle, this);
+                battle.queue.add(bestAction);
+                this.actionmove = bestAction;
+            }
+            this.acted = true;
+            this.done();
+            return null;
         }
         else {
-            var a = getBestAction(battle, this);
-            battle.queue.add(a);
-
-            if (!this.moved && !this.acted) {
-                this.actionmove = getBestMove(battle, this);
-            }
-            battle.queue.add(this.actionmove);
+            //battle.queue.add(new DoNothing(battle, this));
+            this.done();
+            return null;
         }
-        this.done();
-        return null;
+
+        return this;
     }
 
     done() {
@@ -120,6 +151,8 @@ class BattleUnit {
         }
         this.ctr = Math.ceil(this.ct / this.agl);
         this.ready = false;
+        this.moved = false;
+        this.acted = false;
     }
 
     draw(ctx) {
@@ -138,17 +171,8 @@ class BattleUnit {
 
 class GameBattle {
     constructor() {
-        this.units = [
-            new BattleUnit(0, "bash"),
-            new BattleUnit(0, "bash"),
-            new BattleUnit(0, "bash"),
-            new BattleUnit(0, "bash"),
-            new BattleUnit(1, "bash"),
-            new BattleUnit(1, "bash"),
-            new BattleUnit(1, "bash"),
-            new BattleUnit(1, "bash"),
-        ];
-        this.queue = new BattleQueue(this.units);
+        this.units = [];
+        this.queue = new BattleQueue();
         this.activeItem = null;
         this.mapNodes = [];
         this.width = MAP_WIDTH;
@@ -159,12 +183,12 @@ class GameBattle {
 
     start() {
         this.units.forEach(function(u) {
+            this.queue.add(u);
             u.done();
-        });
+        }, this);
     }
 
     update() {
-        
         if (this.activeItem) {
             this.activeItem = this.activeItem.invoke(this);
             this.queue.sort();
@@ -174,6 +198,11 @@ class GameBattle {
         }
 
         output.value = this.queue.toString();
+    }
+
+    addUnit(unit) {
+        this.units.push(unit);
+        this.tile[unit.x][unit.y].addUnit(unit);
     }
 
     moveUnit(unit, node) {
@@ -188,7 +217,7 @@ class GameBattle {
         for (var x=0; x<MAP_WIDTH; x++) {
             for (var y=0; y<MAP_HEIGHT; y++) {
                 ctx.fillStyle = "rgb(0,150,50)";
-                ctx.fillRect(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH - 1, TILE_HEIGHT - 1);
+                ctx.fillRect(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
             }
         }
 
@@ -198,6 +227,10 @@ class GameBattle {
             ctx.fillStyle = "rgb(" + r + ",0," + b + ")";
             ctx.fillRect(node.x * TILE_WIDTH, node.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
         });
+
+        if (this.activeItem) {
+            this.activeItem.draw(ctx);
+        }
 
         this.units.forEach(function(u) {
             u.draw(ctx);

@@ -16,6 +16,11 @@ class MoveNode {
         this.safetyScore = safetyScore;
     }
 
+    draw(ctx) {
+        ctx.fillStyle = "rgba(255, 255, 0, 0.8)";
+        ctx.fillRect(this.x * TILE_WIDTH, this.y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
+    }
+
     toString() {
         return "(" + this.x + ", " + this.y + ")";
     }
@@ -24,22 +29,17 @@ class MoveNode {
 function getSafetyScore(battle, units, unit, x, y) {
     var safetyScore = 0;
 
-    //filter out self
-    var otherUnits = units.filter(function(u) {
-        return u.id != unit.id;
-    });
-
-    otherUnits.forEach(function(u) {
+    units.forEach(function(u) {
         var dx = x - u.x;
         var dy = y - u.y;
         var distance = Math.sqrt(dx*dx + dy*dy);
-        if (distance === 0) { //this should never happen
-            return;
+        if (distance === 0) { //distance from self
+            safetyScore += 0;
         }
-        if (u.team === unit.team) {
+        else if (u.team === unit.team) { //distance from ally
             safetyScore += (1 / distance);
         }
-        else {
+        else { //distance from enemy
             safetyScore -= (1 / distance);
         }
     });
@@ -75,7 +75,7 @@ function createBinaryMap(map, width, height) {
     return bmap;
 }
 
-function getMapNodes(map, units, unit) {
+function getMapNodes(map, units, unit, maxSteps) {
     var binaryMap = createBinaryMap(map, map.width, map.height);
     binaryMap[unit.x][unit.y] = 1; //visit starting node
 
@@ -122,6 +122,11 @@ function getMapNodes(map, units, unit) {
         }
         i++;
     }
+
+    //remove occupied mapNodes
+    nodeList = nodeList.filter(function(node) {
+        return map.tile[node.x][node.y].units.length === 0;
+    });
 
     //normalize safety scores between 0 and 1
     nodeList.forEach(function(node) {
@@ -172,6 +177,14 @@ class BattleMove {
         this.remove = true;
     }
 
+    draw(ctx) {
+        var node = this.node;
+        while (node) {
+            node.draw(ctx);
+            node = node.parent;
+        }
+    }
+
     toString() {
         return "Move - Unit No. " + this.unit.sprite + " - CTR: " + this.ctr + ", Node: " + this.node.x + ", " + this.node.y;
     }
@@ -182,9 +195,20 @@ function getBestMove(battle, unit) {
 
     var mapNodes = getMapNodes(battle, battle.units, unit);
 
+    mapNodes.sort(function(a, b) {
+        return b.safetyScore - a.safetyScore;
+    });
+
+    if (battle.tile[mapNodes[0].x][mapNodes[0].y].units.length > 0) {
+        console.log(mapNodes[0]);
+    }
+
     battle.mapNodes = mapNodes;
 
-    bestMove = new BattleMove(unit, new MoveNode(0, 0, 0, null, 0));
+    bestMove = new BattleMove(
+        unit,
+        mapNodes[0]
+    );
 
     return bestMove;
 }
