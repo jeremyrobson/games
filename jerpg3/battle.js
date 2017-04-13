@@ -47,6 +47,16 @@ class BattleQueue {
         });
     }
 
+    draw(ctx) {
+        this.list.forEach(function(item) {
+            if (item instanceof BattleAction) {
+                ctx.fillStyle = "rgb(255, 255, 0)";
+                ctx.font = "12px Arial";
+                ctx.fillText(item.ctr, item.x * TILE_WIDTH, item.y * TILE_HEIGHT);
+            }
+        });
+    }
+
     toString() {
         var outputText = "";
         this.list.forEach(function(item) {
@@ -66,6 +76,7 @@ class BattleUnit {
         this.y = Math.floor(Math.random() * MAP_HEIGHT),
         this.ct = 100; //CT divided by AGL gives CTR
         this.ctr = 0; //unit turn when CTR = 0
+        this.hp = Math.floor(Math.random() * 50) + 50;
         this.agl = Math.floor(Math.random() * 5) + 5;
         this.actionmove = null;
         this.priority = 0; //actions and moves go before unit turns
@@ -235,5 +246,7 @@ class GameBattle {
         this.units.forEach(function(u) {
             u.draw(ctx);
         });
+
+        this.queue.draw(ctx);
     }
 }

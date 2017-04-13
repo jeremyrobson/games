@@ -45,7 +45,7 @@ function getSafetyScore(battle, units, unit, x, y) {
     });
 
     //check queue for future action spreads that hit this tile
-    var actions = battle.queue.getActions(x, y, 10);
+    var actions = battle.queue.getActions(x, y, 20);
     actions.forEach(function(action) {
         // "what if" the unit moved to the proposed x,y?
         var damage = action.getDamage(unit);
