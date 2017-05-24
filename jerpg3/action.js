@@ -3,24 +3,28 @@ var actions = {
         "ctr": 0,
         "range": 1,
         "shape": "line",
-        "spread": 0
+        "spread": 0,
+        "targetSelf": false
     },
     "spear": { //weapon will override bash's range, shape, spread
         "ctr": 0,
         "range": 2,
         "shape": "line",
-        "spread": 0
+        "spread": 0,
+        "targetSelf": false
     },
     "arrow": { //weapon will override bash's range, shape, spread
         "ctr": 0,
         "range": 5,
-        "spread": 0
+        "spread": 0,
+        "targetSelf": false
     },
     "fire": {
         "ctr": 5,
         "range": 3,
         "shape": "diamond",
-        "spread": 1
+        "spread": 1,
+        "targetSelf": true
     }
 
 }
@@ -33,31 +37,50 @@ function getSpread(x, y, action) {
     return newspread;
 }
 
-function getTargetList(map, unit, move, spread) {
+function getTargetList(map, unit, node, spread) {
     var targetList = [];
     spread.forEach(function(s) {
         var mapunit = map.getUnit(s.x, s.y);
         if (mapunit && mapunit.id != unit.id) { //do not target self based on map location
             targetList.push(mapunit);
         }
-        if (s.x == move.x && s.y == move.y) { //only target self in new move location
+        if (s.x == node.x && s.y == node.y) { //only target self in new move location
             targetList.push(unit);
         }
     });
     return targetList;
 }
 
+function createDiamond(x, y, range, includeCenter) {
+    var diamond = [];
+    for (var i=-range; i<=range; i++) {
+        for (var j=-range; j<=range; j++) {
+            if (!includeCenter && i == j) {
+                continue;
+            }
+            else if (Math.abs(i) + Math.abs(j) <= range) {
+                diamond.push({
+                    x: i + x,
+                    y: j + y
+                });
+            }
+        }
+    }
+    return diamond;
+}
+
 class BattleAction {
-    constructor(battle, unit, action, x, y, node) {
+    constructor(battle, unit, action, d, node, score) {
         this.unit = unit;
         this.ctr = Math.floor(Math.random() * 20); //actions[action].ctr;
-        this.range = actions[action].range;
-        this.spread = getSpread(x, y, actions[action]);
-        this.x = x;
-        this.y = y;
+        this.range = action.range;
+        this.spread = getSpread(x, y, action);
+        this.x = d.x;
+        this.y = d.y;
         this.node = node; //where the unit must be to complete action
         this.ready = false;
         this.remove = false;
+        this.score = 0;
     }
 
     tick() {
@@ -129,6 +152,7 @@ class DoNothing {
 
 function getBestAction(battle, unit) {
     var bestAction = null;
+    var possibleActions = [];
 
     var mapNodes = getMapNodes(battle, battle.units, unit);
 
@@ -138,14 +162,41 @@ function getBestAction(battle, unit) {
 
     battle.mapNodes = mapNodes;
 
-    bestAction = new BattleAction(
-        battle,
-        unit,
-        "bash",
-        Math.floor(Math.random() * 16),
-        Math.floor(Math.random() * 16),
-        mapNodes[0]
-    );
+    unit.actions.forEach(function(action) {
+        mapNodes.forEach(function(node) {
+            var score = node.safetyScore;
+
+            var diamond = createDiamond(node.x, node.y, action.range, action.targetSelf);
+
+            diamond.forEach(function(d) {
+                var spread = getSpread(d.x, d.y, action);
+                spread.forEach(function(s) {
+                    var targetList = getTargetList(battle, unit, node, action.spread);
+
+                    targetList.forEach(function(target) {
+                        score += action.getDamage(target);
+                    });
+                });
+
+                var possibleAction = new BattleAction(
+                    battle,
+                    unit,
+                    action,
+                    d,
+                    node,
+                    score
+                );
+
+                possibleActions.push(possibleAction);
+            });
+        });
+    });
+
+    possibleActions.sort(function(a, b) {
+        return b.score - a.score;
+    });
+
+    bestAction = possibleActions[0];
 
     return bestAction;
 }

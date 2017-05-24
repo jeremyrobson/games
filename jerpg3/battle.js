@@ -84,7 +84,7 @@ class BattleUnit {
         this.moved = false;
         this.acted = false;
 
-        this.action = actions[action];
+        this.actions = [actions[action]];
     }
 
     tick() {
