@@ -1,0 +1,364 @@
+<!doctype html>
+<html>
+<head>
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+    }
+</style>
+
+<script src="color.js"></script>
+<script src="bar.js"></script>
+<script src="hpbox.js"></script>
+<script src="circle.js"></script>
+<script src="spread.js"></script>
+<script src="bullet.js"></script>
+<script src="bomb.js"></script>
+<script src="textball.js"></script>
+<script>
+
+function clamp(val, min, max) {
+    if (val < min) {
+        return min;
+    }
+    if (val > max) {
+        return max;
+    }
+    return val;
+}
+
+var paused = false;
+var canvas, context;
+var units = [], ids = 0;
+var layer1 = [], layer2 = [];
+var mx=0, my=0;
+
+class Unit {
+    constructor(team, sprite) {
+        this.id = ++ids;
+        this.team = team;
+        this.sprite = sprite;
+        this.x = Math.floor(Math.random() * 640);
+        this.y = Math.floor(Math.random() * 480);
+        this.font = "32px Arial";
+        this.CT = 0;
+        this.range = 30;
+        this.agl = Math.random() * 9 + 1;
+        this.speed = Math.random() * 5 + 1;
+        this.ready = false;
+        this.targets = [];
+        this.angle = 0;
+        this.vel = 0;
+        this.hp = 100;
+        this.maxhp = 100;
+        this.hpbox = new HPBox(this);
+        this.action = "ice";
+
+        layer2.push(this.hpbox);
+
+        if (this.team === 0) {
+            this.circle = new Circle(this);
+            layer2.push(this.circle);
+            this.bar = new Bar(280, 400, 150, 24, 0, 1000);
+            layer2.push(this.bar);
+        }
+        
+    }
+
+    isEnemy(unit) {
+        return unit.team !== this.team;
+    }
+
+    applyDamage(damage) {
+        this.hp -= damage;
+        if (this.hp < 0) {
+            this.hp = 0;
+        }
+        layer2.push(new TextBall(this.x, this.y, 24, new Color(255,255,255,1), damage));
+        this.ready = false;
+        this.CT *= 0.5; //lose half CT when hit
+    }
+
+    update() {
+        if (!this.ready) {
+            this.CT += this.agl;
+        }
+
+        if (this.CT >= 1000) {
+            this.CT = 1000;
+            this.ready = true;
+        }
+
+        if (this.team === 0) {
+            this.bar.value = this.CT;
+        }
+
+        this.move();
+    }
+
+    collide(unit) {
+        var damage = getDamage(this, unit);
+        unit.applyDamage(damage);
+        this.done();
+    }
+
+    act() {
+        switch (this.action) {
+            case "ice":
+                this.ice();
+                break;
+            case "fire":
+                this.fire();
+                break;
+            case "bomb":
+                this.bomb();
+                break;
+        }
+    }
+
+    move() {
+        if (this.ready) {
+            //re-acquire targets on every frame to update distances
+            this.targets = acquireTargets(this, getAllyIdList(this));
+
+            this.targets.forEach(function(target) {
+                if (target.distance < this.range + 0.5) {
+                    this.collide(target.unit);
+                }
+            }, this);
+        }
+
+        if (this.team === 0) {
+            this.x = mx;
+            this.y = my;
+        }
+        else {
+            if (this.targets[0]) {
+                var target = this.targets[0].unit;
+                var distance = this.targets[0].distance;
+                var tx = target.x;
+                var ty = target.y;
+                this.angle = Math.atan2(this.y - ty, this.x - tx);
+                
+                if (this.ready) {
+                    this.vel = clamp((distance - this.range) / 10, -this.speed, this.speed);
+                }
+                else {
+                    if (target.isEnemy(this)) {
+                        this.vel = -this.speed;
+                    }
+                }
+            }
+
+            this.vel = this.vel * this.CT / 1000; //velocity is modified by CT percentage
+
+            this.x = clamp(this.x - Math.cos(this.angle) * this.vel, 0, 640);
+            this.y = clamp(this.y - Math.sin(this.angle) * this.vel, 0, 480);
+        }
+    }
+
+    fire() {
+        if (this.CT === 1000) {
+            layer1.push(new Spread(this, this.x, this.y, 100, "255,0,0"));
+            this.CT = 0;
+            this.ready = false;
+        }
+    }
+
+    ice() {
+        if (this.CT > 250) {
+            var x = this.circle.x;
+            var y = this.circle.y;
+            var x1 = this.x;
+            var y1 = this.y;
+            var x2 = this.circle.x;
+            var y2 = this.circle.y;
+            layer1.push(new Bullet(this, x, y, x1, y1, x2, y2));
+            this.CT -= 250;
+            this.ready = false;
+        }
+    }
+
+    bomb() {
+        if (this.CT > 250) {
+            layer1.push(new Bomb(this, this.x, this.y));
+            this.CT -= 250;
+            this.ready = false;
+        }
+    }
+
+    done() {
+        this.ready = false;
+        this.CT = 250;
+        //this.targets = []; //can't reset this or unit won't know who to run from
+    }
+
+    draw(ctx) {
+        ctx.textBaseline = "top";
+        ctx.font = this.font;
+        ctx.fillText(this.sprite, this.x - 16, this.y - 16);
+    }
+}
+
+function getDistance(o1, o2) {
+    var dx = o2.x - o1.x;
+    var dy = o2.y - o1.y;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getDamage(actor, target) {
+    return Math.floor(Math.random() * 7) + Math.floor(Math.random() * 7);
+}
+
+/*
+    get list of target and distance from point
+    ignoreList is an array of ids, indicates which units to ignore
+*/
+function acquireTargets(point, ignoreList) {
+    var targets = [];
+
+    units.filter(function(u) {
+        return ignoreList.indexOf(u.id) < 0;
+    }).forEach(function(u) {
+        targets.push({
+            unit: u,
+            distance: getDistance(point, u)
+        })
+    });
+
+    targets.sort(function(a, b) {
+        return a.distance - b.distance;
+    });
+
+    return targets;
+}
+
+/*
+    get bombs within radius of circle
+    ignorelist contains id of person who set bomb and bomb itself
+*/
+function getBombs(x, y, radius, ignoreList) {
+    var bombs = [];
+
+    layer1.filter(function(obj) {
+        return ignoreList.indexOf(obj.id) < 0;
+    }).forEach(function(obj) {
+        if (obj instanceof Bomb) {
+            bombs.push(obj);
+        }
+    });
+
+    return bombs;
+}
+
+function getAllyIdList(unit) {
+    var arr = [];
+
+    units.forEach(function(u) {
+        if (u.team === unit.team) {
+            arr.push(u.id);
+        }
+    });
+
+    return arr;
+}
+
+function update() {
+    context.fillStyle = "rgb(50,200,50)";
+    context.fillRect(0,0,640,480);
+
+    layer1 = layer1.filter(function(obj) {
+        return !obj.remove;
+    });
+
+    layer1.forEach(function(obj) {
+        obj.update();
+    });
+
+    layer2 = layer2.filter(function(obj) {
+        return !obj.remove;
+    });
+
+    layer2.forEach(function(obj) {
+        obj.update();
+    });
+
+    draw();
+
+    if (!paused) {
+        window.requestAnimationFrame(update);
+    }
+}
+
+function draw() {
+    layer1.forEach(function(obj) {
+        obj.draw(context, 0, 0);
+    });
+
+    layer2.forEach(function(obj) {
+        obj.draw(context, 0, 0);
+    });
+}
+
+function init() {
+    units.push(new Unit(0, "😀"));
+    units.push(new Unit(1, "🐛"));
+    units.push(new Unit(1, "🐍"));
+    units.push(new Unit(1, "🦂"));
+
+    units.forEach(function(u) {
+        layer1.push(u);
+    });
+
+    update();
+}
+
+function mouse_down(e) {
+    units[0].act();
+}
+
+function mouse_move(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+}
+
+function pause() {
+    paused = true;
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    canvas.onmousemove = mouse_move;
+    canvas.onmousedown = mouse_down;
+
+    init();
+};
+
+function ice() {
+    units[0].action = "ice";
+}
+
+function fire() {
+    units[0].action = "fire";
+}
+
+function bomb() {
+    units[0].action = "bomb";
+}
+
+</script>
+
+</head>
+
+<body>
+
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <a href="javascript:ice();">ice</a>
+    <a href="javascript:fire();">fire</a>
+    <a href="javascript:bomb();">bomb</a>
+</body>
+
+</html>
