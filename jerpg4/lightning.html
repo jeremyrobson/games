@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var layer1 = [];
+
+class Bolt {
+    constructor(x, y, angle, alpha, lineWidth, parent, ancestor) {
+        this.parent = parent;
+        this.ancestor = parent === null ? this : ancestor;
+        this.x1 = x;
+        this.y1 = y;
+        this.x2 = x;
+        this.y2 = y;
+        this.angle = angle;
+        this.stop = false;
+        this.life = 0;
+        this.color = "255,255,255";
+        this.alpha = alpha;
+        this.lineWidth = lineWidth;
+        this.remove = false;
+        this.zapped = false;
+    }
+
+    zap() {
+        this.zapped = true;
+        this.alpha = 1;
+        this.lineWidth += 2;
+        if (this.parent) {
+            this.parent.zap();
+        }
+    }
+
+    update() {
+        if (!this.stop) {
+            this.life++;
+            this.x2 += Math.cos(this.angle) * 10;
+            this.y2 += Math.sin(this.angle) * 10;
+
+            if (Math.random() < 0.5) {
+                this.stop = true;
+                var randomAngle = Math.random() * Math.PI;
+                var alpha = this.alpha - Math.random() * 0.1;
+                var lineWidth = this.lineWidth - Math.random() * 0.1;
+                layer1.push(new Bolt(this.x2, this.y2, randomAngle, alpha, lineWidth, this, this.ancestor));
+                if (Math.random() < this.life / 10) {
+                    var alpha = this.alpha - Math.random() * 0.1;
+                    var lineWidth = this.lineWidth - Math.random() * 0.1;
+                    layer1.push(new Bolt(this.x2, this.y2, Math.PI - randomAngle, alpha, lineWidth, this, this.ancestor));
+                }
+            }
+        }
+
+        if (this.x1 > 640 || this.y1 > 480) {
+            this.stop = true;
+
+            if (this.parent && !this.ancestor.zapped) {
+                this.zap();
+            }
+        }
+
+        this.alpha -= 0.01;
+        if (this.alpha <= 0) {
+            this.alpha = 0;
+            this.remove = true;
+        }
+    }
+
+    draw(ctx) {
+        ctx.strokeStyle = "rgba(" + this.color + "," + this.alpha + ")";
+        ctx.beginPath();
+        ctx.moveTo(this.x1, this.y1);
+        ctx.lineTo(this.x2, this.y2);
+        ctx.lineWidth = this.lineWidth;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "rgb(0, 255, 255)";
+        ctx.stroke();
+    }
+}
+
+function update() {
+    layer1 = layer1.filter(function(obj) {
+        return !obj.remove;
+    });
+
+    layer1.forEach(function(obj) {
+        obj.update();
+    });
+
+    draw();
+
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+    context.fillStyle = "rgb(0,55,100)";
+    context.fillRect(0, 0, 640, 480);
+
+    layer1.forEach(function(obj) {
+        obj.draw(context);
+    });
+}
+
+function init() {
+    
+    window.requestAnimationFrame(update);
+}
+
+function mouse_down(e) {
+    layer1.push(new Bolt(e.offsetX, e.offsetY, Math.random() * Math.PI, 1.0, 2, null));
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    canvas.onmousedown = mouse_down;
+
+    init();
+};
+
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>
