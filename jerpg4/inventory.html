@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var sprites = ["🍇","🍈","🍉","🍊","🍋","🍌","🍍","🍎"];
+var mx, my, p1, p2;
+var selitem;
+var ids = 0;
+
+var layer3 = {
+    id: ++ids,
+    list: [],
+    parent: null
+}; 
+
+class Container {
+    constructor(x, y, width, height, parent) {
+        this.id = ++ids;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = "rgba(50, 100, 200, 0.8)";
+        this.list = [];
+        this.parent = parent;
+    }
+
+    hit(x, y) {
+        return x >= this.x && y >= this.y && x < this.x + this.width && y < this.y + this.height;
+    }
+
+    move(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    mouse_down(mx, my) {
+        if (this.hit(mx, my)) {
+            var obj = this.list.find(function(obj) {
+                return obj.mouse_down(mx - this.x, my - this.y);
+            }, this);
+
+            if (obj) {
+                remove_item(obj);
+                return obj;
+            }
+            return this;
+        }
+    }
+
+    mouse_move(mx, my) {
+        return true;
+    }
+
+    mouse_up(mx, my, obj) {
+        if (this.hit(mx, my) && obj && !(obj instanceof Container)) {
+            remove_item(obj);
+            this.list.unshift(obj);
+            obj.parent = this;
+            obj.move(mx - this.x, my - this.y);
+            return this;
+        }
+    }
+
+    update() {
+
+    }
+
+    draw(ctx, offsetx, offsety) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x + offsetx, this.y + offsety, this.width, this.height);
+
+        for (var i=this.list.length - 1; i >= 0; i--) {
+            var obj = this.list[i];
+            obj.draw(ctx, this.x, this.y);
+        };
+    }
+}
+
+class Thing {
+    constructor(x, y, parent) {
+        this.id = ++ids;
+        this.x = x;
+        this.y = y;
+        this.sprite = sprites[Math.floor(Math.random() * sprites.length)];
+        this.parent = parent;
+        this.color = "255,255,255";
+        this.alpha = 1.0;
+    }
+
+    hit(x, y) {
+        var dx = x - this.x;
+        var dy = y - this.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < 16;
+    }
+
+    move(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    mouse_down(mx, my) {
+        if (this.hit(mx, my)) {
+            return this;
+        }
+    }
+
+    mouse_move(mx, my) {
+        if (this.hit(mx, my)) {
+
+        }
+    }
+
+    mouse_up(mx, my) {
+
+    }
+
+    update() {
+
+    }
+
+    draw(ctx, offsetx, offsety) {
+        ctx.font = "32px Arial";
+        ctx.fillStyle = "rgba(" + this.color + "," + this.alpha + ")";
+        ctx.fillText(this.sprite, this.x - 20 + offsetx, this.y - 20 + offsety);
+    }
+}
+
+function remove_item(obj) {
+    obj.parent.list = obj.parent.list.filter(function(item) {
+        return item.id !== obj.id;
+    });
+}
+
+function move_to_front(obj) {
+    if (obj.parent) {
+        if (obj.parent.parent) {
+            move_to_front(obj.parent)
+        }
+        remove_item(obj);
+        obj.parent.list.unshift(obj);
+    }
+}
+
+function mouse_down(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+    p1 = {x: mx, y: my};
+
+    layer3.list.find(function(item) {
+        var obj = item.mouse_down(mx, my);
+        console.log(obj);
+        if (obj) {
+            obj.alpha = 0.7;
+            move_to_front(obj);
+            selitem = obj;
+            p2 = {x: selitem.x, y: selitem.y};
+            return obj;
+        }
+    });
+}
+
+function mouse_up(e) {
+    if (!selitem) {
+        return;
+    }
+
+    selitem.alpha = 1.0;
+
+    mx = e.offsetX;
+    my = e.offsetY;
+    
+    //get all containers that aren't the selitem
+    //do a hittest for dropping the selitem in the container
+    var dropped = layer3.list.filter(function(obj) {
+        return obj.id !== selitem.id && obj instanceof Container;
+    }).find(function(obj) {
+        return obj.mouse_up(mx, my, selitem);
+    });
+
+    if (!dropped && selitem.parent.id !== layer3.id) {
+        layer3.list.unshift(selitem);
+        remove_item(selitem);
+        console.log(selitem.parent.list);
+        selitem.move(mx, my);
+        selitem.parent = layer3;
+    }
+
+    selitem = null;
+}
+
+function mouse_move(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+
+    if (selitem) {
+        selitem.move(mx + p2.x - p1.x, my + p2.y - p1.y);
+    }
+
+    /*
+    layer3.forEach(function(obj) {
+        return obj.mouse_move(mx, my);
+    });
+    */
+}
+
+function update() {
+
+    layer3.list.forEach(function(obj) {
+        obj.update();
+    });
+
+    draw();
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+    context.clearRect(0, 0, 640, 480);
+
+    for (var i=layer3.list.length - 1; i >= 0; i--) {
+        var obj = layer3.list[i];
+        obj.draw(context, 0, 0);
+    };
+}
+
+function init() {
+    layer3.list.push(new Container(0, 0, 200, 200, layer3));
+    layer3.list.push(new Container(300, 300, 200, 200, layer3));
+
+    for (var i=0; i<10; i++) {
+        layer3.list.push(new Thing(Math.floor(Math.random() * 640), Math.floor(Math.random() * 480), layer3));
+    }
+
+    window.requestAnimationFrame(update);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+    canvas.onmousedown = mouse_down;
+    canvas.onmousemove = mouse_move;
+    canvas.onmouseup = mouse_up;
+
+    init();
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>
