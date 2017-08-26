@@ -5,28 +5,149 @@
 
 <script>
 
+Array.prototype.forEachReverse = function(fn, scope) {
+    for (var i=this.length - 1; i >= 0; i--) {
+        fn.call(scope, this[i], i);
+    };
+};
+
 var canvas, context;
 var sprites = ["🍇","🍈","🍉","🍊","🍋","🍌","🍍","🍎"];
 var mx, my, p1, p2;
 var selitem;
 var ids = 0;
 
-var layer3 = {
-    id: ++ids,
-    list: [],
-    parent: null
-}; 
+var layers = [];
+var sprite_layer, gump_layer;
+var inventory, equipment;
 
-class Container {
-    constructor(x, y, width, height, parent) {
+class Layer {
+    constructor() {
         this.id = ++ids;
+        this.x = 0;
+        this.y = 0;
+        this.list = [];
+        this.parent = null;
+    }
+
+    add(item) {
+        this.list.unshift(item);
+        this.list.forEachReverse(function(item, i) {
+            item.zOrder = this.list.length - i - 1;
+        }, this);
+        item.parent = this;
+    }
+
+    remove(obj) {
+        this.list = this.list.filter(function(item) {
+            return item.id !== obj.id;
+        });
+    }
+
+    mouse_down(mx, my) {
+
+    }
+
+    mouse_move(mx, my) {
+        this.list.forEach(function(obj) {
+            return obj.mouse_move(mx, my);
+        });
+    }
+
+    update() {
+        this.list.forEach(function(obj) {
+            obj.update();
+        });
+    }
+
+    draw(ctx) {
+        this.list.filter(function(obj) {
+            return obj.visible;
+        }).forEachReverse(function(obj) {
+            obj.draw(context, 0, 0);
+        });
+    }
+}
+
+class Button {
+    constructor(x, y, text, fn) {
         this.x = x;
         this.y = y;
+        this.zOrder = 0;
+        this.clickPrecedence = 1;
+        this.text = text;
+        this.fn = fn;
+        this.font = "24px Arial";
+        this.width = 50;
+        this.height = 24;
+        this.visible = true;
+        this.parent = null;
+    }
+
+    hit(x, y) {
+        return x >= this.x && y >= this.y && x < this.x + this.width && y < this.y + this.height;
+    }
+
+    mouse_down(mx, my) {
+        if (this.hit(mx, my)) {
+            this.fn();
+            return null; //do not return "this" or else container will try to remove button
+        }
+    }
+
+    mouse_move(mx, my) {
+        //todo: highlight
+    }
+
+    draw(ctx, offsetx, offsety) {
+        //ctx.fillStyle = this.color;
+        //ctx.fillRect(this.x + offsetx, this.y + offsety, this.width, this.height);
+
+        ctx.fillStyle = "rgba(255,255,255,1.0)";
+        ctx.font = this.font;
+        ctx.fillText(this.text, this.x + offsetx, this.y + offsety);
+    }
+}
+
+class Container {
+    constructor(name, x, y, width, height) {
+        this.id = ++ids;
+        this.name = name;
+        this.x = x;
+        this.y = y;
+        this.zOrder = 0;
+        this.clickPrecedence = 1;
         this.width = width;
         this.height = height;
         this.color = "rgba(50, 100, 200, 0.8)";
         this.list = [];
-        this.parent = parent;
+        this.font = "48px Arial";
+        this.visible = true;
+        this.parent = null;
+
+        var self = this;
+        this.list.push(new Button(this.width - 24, 0, "X", function() {
+            self.visible = false;
+        }));
+    }
+
+    add(item) {
+        this.list.unshift(item);
+        item.parent = this;
+    }
+
+    remove(obj) {
+        this.list = this.list.filter(function(item) {
+            return item.id !== obj.id;
+        });
+    }
+
+    move_to_front(obj) {
+        if (obj.parent.parent) {
+            move_to_front(obj.parent)
+        }
+        remove_item(obj);
+        obj.parent.list.unshift(obj);
     }
 
     hit(x, y) {
@@ -45,7 +166,6 @@ class Container {
             }, this);
 
             if (obj) {
-                remove_item(obj);
                 return obj;
             }
             return this;
@@ -56,12 +176,8 @@ class Container {
         return true;
     }
 
-    mouse_up(mx, my, obj) {
-        if (this.hit(mx, my) && obj && !(obj instanceof Container)) {
-            remove_item(obj);
-            this.list.unshift(obj);
-            obj.parent = this;
-            obj.move(mx - this.x, my - this.y);
+    mouse_up(mx, my) {
+        if (this.hit(mx, my)) {
             return this;
         }
     }
@@ -74,22 +190,28 @@ class Container {
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x + offsetx, this.y + offsety, this.width, this.height);
 
-        for (var i=this.list.length - 1; i >= 0; i--) {
-            var obj = this.list[i];
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = this.font;
+        ctx.fillText(this.name, this.x, this.y);
+
+        this.list.forEachReverse(function(obj) {
             obj.draw(ctx, this.x, this.y);
-        };
+        }, this);
     }
 }
 
 class Thing {
-    constructor(x, y, parent) {
+    constructor(x, y) {
         this.id = ++ids;
         this.x = x;
         this.y = y;
+        this.zOrder = 0;
+        this.clickPrecedence = 2;
         this.sprite = sprites[Math.floor(Math.random() * sprites.length)];
-        this.parent = parent;
+        this.parent = null;
         this.color = "255,255,255";
         this.alpha = 1.0;
+        this.visible = true;
     }
 
     hit(x, y) {
@@ -131,38 +253,44 @@ class Thing {
     }
 }
 
-function remove_item(obj) {
-    obj.parent.list = obj.parent.list.filter(function(item) {
-        return item.id !== obj.id;
-    });
-}
-
-function move_to_front(obj) {
-    if (obj.parent) {
-        if (obj.parent.parent) {
-            move_to_front(obj.parent)
-        }
-        remove_item(obj);
-        obj.parent.list.unshift(obj);
-    }
-}
-
 function mouse_down(e) {
     mx = e.offsetX;
     my = e.offsetY;
     p1 = {x: mx, y: my};
 
-    layer3.list.find(function(item) {
-        var obj = item.mouse_down(mx, my);
-        console.log(obj);
-        if (obj) {
-            obj.alpha = 0.7;
-            move_to_front(obj);
-            selitem = obj;
-            p2 = {x: selitem.x, y: selitem.y};
-            return obj;
-        }
+    //get all items on all clickable layers
+    var list = [];
+    layers.forEach(function(layer) {
+        list = list.concat(layer.list);
     });
+
+    //filter non-visible items
+    list = list.filter(function(item) {
+        return item.visible;
+    });
+
+    //sort list by precedence z
+    list.sort(function(a, b) {
+        if (a.clickPrecedence > b.clickPrecedence) return 1;
+        if (a.clickPrecedence < b.clickPrecedence) return -1;
+        if (a.zOrder > b.zOrder) return -1;
+        if (a.zOrder < b.zOrder) return 1;
+        return 0;
+    });
+
+    //find item in list that was clicked (does not include container sub-items)
+    selitem = list.find(function(item) {
+        return item.hit(mx, my);
+    });
+
+    if (selitem) {
+        selitem = selitem.mouse_down(mx, my); //this will get a sub-item if the item is a container
+        selitem.parent.remove(selitem);
+        selitem.alpha = 0.7;
+        p2 = {x: selitem.x + selitem.parent.x, y: selitem.y + selitem.parent.y};
+        selitem.move(mx + p2.x - p1.x, my + p2.y - p1.y);
+    }
+    
 }
 
 function mouse_up(e) {
@@ -174,21 +302,24 @@ function mouse_up(e) {
 
     mx = e.offsetX;
     my = e.offsetY;
-    
-    //get all containers that aren't the selitem
-    //do a hittest for dropping the selitem in the container
-    var dropped = layer3.list.filter(function(obj) {
-        return obj.id !== selitem.id && obj instanceof Container;
-    }).find(function(obj) {
-        return obj.mouse_up(mx, my, selitem);
-    });
 
-    if (!dropped && selitem.parent.id !== layer3.id) {
-        layer3.list.unshift(selitem);
-        remove_item(selitem);
-        console.log(selitem.parent.list);
-        selitem.move(mx, my);
-        selitem.parent = layer3;
+    if (selitem instanceof Container) {
+        gump_layer.add(selitem);
+    }
+    else {
+        var drop_container = gump_layer.list.filter(function(obj) {
+            return obj.visible;
+        }).find(function(obj) {
+            return obj.mouse_up(mx, my, selitem);
+        });
+
+        if (drop_container) {
+            drop_container.add(selitem);
+            selitem.move(selitem.x - drop_container.x, selitem.y - drop_container.y);
+        }
+        else {
+            sprite_layer.add(selitem);
+        }
     }
 
     selitem = null;
@@ -202,17 +333,15 @@ function mouse_move(e) {
         selitem.move(mx + p2.x - p1.x, my + p2.y - p1.y);
     }
 
-    /*
-    layer3.forEach(function(obj) {
-        return obj.mouse_move(mx, my);
+    layers.forEach(function(layer) {
+        return layer.mouse_move(mx, my);
     });
-    */
 }
 
 function update() {
 
-    layer3.list.forEach(function(obj) {
-        obj.update();
+    layers.forEach(function(layer) {
+        layer.update();
     });
 
     draw();
@@ -222,18 +351,30 @@ function update() {
 function draw() {
     context.clearRect(0, 0, 640, 480);
 
-    for (var i=layer3.list.length - 1; i >= 0; i--) {
-        var obj = layer3.list[i];
-        obj.draw(context, 0, 0);
-    };
+    layers.forEach(function(layer) {
+        layer.draw(context);
+    });
+
+    if (selitem) {
+        selitem.draw(context, 0, 0);
+    }
 }
 
 function init() {
-    layer3.list.push(new Container(0, 0, 200, 200, layer3));
-    layer3.list.push(new Container(300, 300, 200, 200, layer3));
+    sprite_layer = new Layer();
+    gump_layer = new Layer();
+
+    inventory = new Container("Inventory", 0, 0, 300, 200);
+    equipment = new Container("Equipment", 300, 300, 300, 200);
+
+    gump_layer.add(inventory);
+    gump_layer.add(equipment);
+
+    layers.push(sprite_layer);
+    layers.push(gump_layer);
 
     for (var i=0; i<10; i++) {
-        layer3.list.push(new Thing(Math.floor(Math.random() * 640), Math.floor(Math.random() * 480), layer3));
+        sprite_layer.add(new Thing(Math.floor(Math.random() * 640), Math.floor(Math.random() * 480)));
     }
 
     window.requestAnimationFrame(update);
