@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var layer4 = [];
+
+class Dialog {
+    constructor(text) {
+        this.x = 0;
+        this.y = 0;
+        this.width = 640;
+        this.height = 200;
+        this.text = text;
+        this.font = "24px Arial";
+        this.paragraphs = this.text.split("\n");
+
+        this.nextParagraph();
+    }
+
+    nextParagraph() {
+        var paragraph = this.paragraphs.shift();
+
+        if (paragraph) {
+            this.lines = [];
+            this.words = paragraph.trim().split(" ");
+
+            var i = 0;
+            var nextWord = "";
+            while (this.words.length > 0) {
+                this.lines[i] = nextWord;
+                context.font = this.font;
+                while (this.words.length > 0) {
+                    nextWord = this.words.shift();
+                    if (context.measureText(this.lines[i] + nextWord).width < this.width) {
+                        this.lines[i] = this.lines[i] + nextWord + " ";
+                        nextWord = "";
+                    }
+                    else {
+                        nextWord = nextWord + " ";
+                        break;
+                    }
+                }
+                i++;
+            }
+
+            this.currentLine = 0;
+            this.lineOffset = 0;
+            this.displayLines = [];
+            this.displayLines[0] = "";
+        }
+    }
+
+    update() {
+        if (this.lines[this.currentLine]) {
+            var letter = this.lines[this.currentLine].slice(0,1);
+            this.lines[this.currentLine] = this.lines[this.currentLine].substr(1);
+            this.displayLines[this.currentLine] += letter;
+
+            //go to next line
+            if (this.lines[this.currentLine].length == 0) {
+                this.currentLine++;
+                this.displayLines[this.currentLine] = "";
+                if (this.currentLine > 5) {
+                    this.lineOffset++;
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = "rgb(0,0,255)";
+        ctx.font = this.font;
+
+        for (var i=this.lineOffset; i<this.displayLines.length; i++) {
+            var y = (i - this.lineOffset) * 24;
+            ctx.fillText(this.displayLines[i], 0, y);
+        }
+    }
+}
+
+function mouse_down() {
+    layer4[0].nextParagraph();
+}
+
+function update() {
+
+    layer4[0].update();
+
+    draw();
+
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+    context.clearRect(0, 0, 640, 480);
+
+    layer4[0].draw(context);
+}
+
+function init() {
+    var text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi a neque ipsum. Nam imperdiet dolor a aliquet mollis. Aliquam ac diam et lorem sagittis sodales at non elit. Nullam ullamcorper diam eros, at fermentum augue posuere et.\n Vestibulum a est eu tellus sagittis vestibulum. Etiam non lorem lorem.\n Aliquam sollicitudin, sapien dapibus luctus lacinia, odio massa aliquam lorem, non facilisis elit sem at ipsum. In venenatis leo diam, ac molestie odio vestibulum et. Aliquam pulvinar tincidunt tellus vel efficitur. \nInteger varius lorem et mattis pellentesque. Pellentesque tristique, elit eu blandit semper, lectus lectus porta diam, vel luctus augue dui molestie ipsum. Interdum et malesuada fames ac ante ipsum primis in faucibus. Nam ullamcorper non velit at elementum. Phasellus fringilla sem vitae posuere cursus. \nEtiam pharetra vitae ex nec congue. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris congue erat ut vehicula sagittis. Donec aliquam ac nisl eget accumsan. Pellentesque pretium ligula et porttitor viverra. Quisque ut ex semper, blandit leo et, egestas mauris.\n Donec consequat gravida lacus a viverra. Sed bibendum in diam quis interdum. Nunc ut fringilla purus, vitae semper augue. Duis vel vulputate quam. Nulla scelerisque, purus a rutrum aliquet, nisi nisl cursus nunc, vel vehicula sem ipsum at lectus.";
+    var dialog = new Dialog(text);
+
+    layer4.push(dialog);
+
+    window.requestAnimationFrame(update);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+    canvas.onmousedown = mouse_down;
+
+    init();
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>
