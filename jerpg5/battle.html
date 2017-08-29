@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script src="task.js"></script>
+<script src="queue.js"></script>
+<script src="unit.js"></script>
+<script>
+
+var sprites = ['😀','😃','😅','😎','😍'];
+var tasksprites = {
+    "move": "🚶🏻",
+    "action": "🤺",
+    "done": "🏁"
+};
+
+var canvas, context;
+var lasttick = 0;
+var units = [];
+var queue = new Queue();
+var activeItem;
+
+
+function getNextActiveUnit() {
+
+}
+
+function update() {
+    
+    if (lasttick + 500 < Date.now()) {
+        if (activeItem) {
+            if (activeItem instanceof Unit) {
+                queue.add(activeItem.turn());
+            }
+            else {
+                activeItem.turn();
+            }
+            activeItem = null;
+        }
+        else {
+            activeItem = queue.tick();
+        }
+        lasttick = Date.now();
+    }
+
+    draw();
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+    context.clearRect(0, 0, 640, 480);
+
+    for (var x=0; x<12; x++) {
+        for (var y=0; y<12; y++) {
+            if ((x & 1) ^ (y & 1)) {
+                context.fillStyle = "rgb(200, 200, 200)";
+                context.fillRect(x * 40, y * 40, 40, 40);
+            }
+        }
+    }
+
+    if (activeItem) {
+        context.fillStyle = "rgba(0,255,255,0.8)";
+        context.fillRect(activeItem.x * 40, activeItem.y * 40, 40, 40);
+    }
+
+    units.forEach(function(unit) {
+        unit.draw(context);
+    });
+
+    queue.draw(context);
+}
+
+function init() {
+
+    units.push(new Unit(0, 0, 0));
+    units.push(new Unit(0, 1, 0));
+    units.push(new Unit(0, 0, 1));
+
+    units.push(new Unit(0, 11, 11));
+    units.push(new Unit(0, 10, 11));
+    units.push(new Unit(0, 11, 10));
+
+    units.forEach(function(unit) {
+        queue.add(unit);
+    });
+
+    window.requestAnimationFrame(update);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+
+    init();
+};
+
+</script>
+
+</head>
+
+<body>
+
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>
