@@ -8,6 +8,7 @@ class Unit {
         this.CT = 0;
         this.CTR = 0; // Math.ceil(100 / this.agl);
         this.moverange = Math.floor(Math.random() * 5) + 5;
+        this.action = null;
         this.moved = false;
         this.acted = false;
         this.moveNodes = null;
@@ -19,8 +20,43 @@ class Unit {
     }
 
     turn() {
-        if (!this.moved) {
+        var task = null;
+
+        if (!this.moved && !this.acted) {
             this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange);
+            this.action = getBestAction(this);
+            
+            if (this.action.requiresMove) {
+                this.path = getPath(this.action.node);
+                var task = new Task("move", this, 999, function(unit) { //task invoke
+                    var p = unit.path.getNextNode();
+                    if (p) {
+                        unit.move(p.x, p.y);
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
+                }, function(unit) { //task done
+                    unit.moved = true;
+                    unit.moveNodes = null;
+                    unit.path = null;
+                });
+            }
+            else {
+                var task = new Task("action", this, 999, function(unit) { //task invoke
+                    unit.action.invoke();
+                    return false;
+                }, function(unit) { //task done
+                    unit.acted = true;
+                    unit.action = null;
+                });
+            }
+        }
+        else if (!this.moved) {
+            this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange);
+
+            //todo: move to safest node, not random one
             var randomNode = this.moveNodes[Math.floor(Math.random() * this.moveNodes.length)];
             this.path = getPath(randomNode);
             var task = new Task("move", this, 999, function(unit) { //task invoke
@@ -37,8 +73,18 @@ class Unit {
                 unit.moveNodes = null;
                 unit.path = null;
             });
+        }
+        else if (!this.acted) {
+            this.moveNodes = [new MoveNode(this.x, this.y, 0, null, 0)];
+            this.action = getBestAction(this);
 
-            return task;
+            var task = new Task("action", this, 999, function(unit) { //task invoke
+                unit.action.invoke();
+                return false;
+            }, function(unit) { //task done
+                unit.acted = true;
+                unit.action = null;
+            });
         }
         else {
             var task = new Task("done", this, 999, function(unit) { //task invoke
@@ -47,14 +93,15 @@ class Unit {
             }, function(unit) { //task done
                 unit.done();
             });
-
-            return task;
         }
+
+        return task;
     }
 
     done() {
         this.CT = 0;
         this.moved = false;
+        this.acted = false;
     }
 
     move(x, y) {
@@ -82,12 +129,7 @@ function getMoveNodes(unit, startX, startY, range) {
     var binaryMap = createTileMap(12, 12, 0);
     var objectMap = createObjectMap();
 
-    var startNode = {
-        x: startX,
-        y: startY,
-        steps: 0,
-        parent: null
-    };
+    var startNode = new MoveNode(startX, startY, 0, null, 0);
 
     moveNodes.push(startNode);
 
@@ -128,20 +170,15 @@ function getMoveNodes(unit, startX, startY, range) {
                 }
             }
 
-            moveNodes.push({
-                x: x,
-                y: y,
-                steps: steps,
-                parent: moveNodes[i]
-            });
+            moveNodes.push(new MoveNode(x, y, steps, moveNodes[i], 0));
         }
 
         i++;
     }
 
-    //remove occupied tiles (team members and self)
-    moveNodes = moveNodes.filter(function(node) {
-        return !objectMap[node.x][node.y];
+    //remove occupied tiles (team members, trees, etc., but not self on first node)
+    moveNodes = moveNodes.filter(function(node, i) {
+        return !objectMap[node.x][node.y] || i === 0;
     });
 
     return moveNodes;
@@ -162,4 +199,76 @@ function getPath(node) {
             return this.nodes[this.index++];
         }
     };
+}
+
+function getBestAction(unit) {
+    var actionList = [];
+    unit.moveNodes.forEach(function(node, i) {
+        var rangeList = [
+            {x: node.x - 1, y: node.y},
+            {x: node.x + 1, y: node.y},
+            {x: node.x, y: node.y - 1},
+            {x: node.x, y: node.y + 1},
+        ];
+        rangeList.forEach(function(r) {
+            var actiontemplate = "melee";
+
+            if (r.x === unit.x && r.y === unit.y && i > 0) {
+                //if i > 0 then the unit has moved before invoking this action
+                //if r.xy === unit.xy then it is attempting to invoke an action
+                //on its former position post-move, which is a no-no
+            }
+            else {
+                var targetList = getTargetList(actiontemplate, r);
+                var score = calculateActionScore(actiontemplate, unit, targetList);
+                actionList.push(new Action(actiontemplate, unit, node, r, score));
+            }
+        });
+    });
+
+    actionList.sort(function(a, b) {
+        return b.score - a.score;
+    });
+
+    console.log(actionList);
+
+    return actionList[0];
+}
+
+function getBestMove(unit) {
+
+}
+
+function getTargetList(actiontemplate, r) {
+    var spread = [r]; //getSpread(actiontemplate.spread, r);
+    var targetList = [];
+
+    //actiontemplate.spread.forEach()
+
+    spread.forEach(function(s) {
+        var unit = getUnitByPosition(s.x, s.y);
+        if (unit) {
+            targetList.push(unit);
+        }
+    });
+
+    return targetList;
+}
+
+function calculateActionScore(actiontemplate, unit, targetList) {
+    var score = 0;
+
+    targetList.forEach(function(target) {
+        score += calculateDamage(actiontemplate, unit, target);
+    });
+
+    return score;
+}
+
+function calculateDamage(actiontemplate, unit, r) {
+    var damage = 0;
+
+    damage = Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 2;
+
+    return damage;
 }

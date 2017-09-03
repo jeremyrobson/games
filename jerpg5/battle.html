@@ -5,6 +5,8 @@
 
 <script src="task.js"></script>
 <script src="queue.js"></script>
+<script src="movenode.js"></script>
+<script src="action.js"></script>
 <script src="unit.js"></script>
 <script src="map.js"></script>
 <script>
@@ -24,8 +26,10 @@ var queue = new Queue();
 var activeItem;
 
 
-function getNextActiveUnit() {
-
+function getUnitByPosition(x, y) {
+    return units.filter(function(u) {
+        return u.x == x && u.y == y;
+    })[0];
 }
 
 function update() {
@@ -83,6 +87,10 @@ function draw() {
             });
         }
 
+        if (unit.action) {
+            unit.action.draw(context);
+        }
+
         if (unit) {
             context.fillStyle = "rgba(0,255,255,0.4)";
             context.fillRect(unit.x * 40, unit.y * 40, 40, 40);
@@ -115,6 +123,7 @@ function init() {
 
 function pause() {
     paused = true;
+    console.log("paused!");
 }
 
 window.onload = function() {
