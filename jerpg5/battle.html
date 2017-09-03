@@ -6,9 +6,10 @@
 <script src="task.js"></script>
 <script src="queue.js"></script>
 <script src="unit.js"></script>
+<script src="map.js"></script>
 <script>
 
-var sprites = ['😀','😃','😅','😎','😍'];
+var sprites = ['😁','😃','😅','😎','😍','😆','🙃','😉','😜','🤓','🤠','😒','😟','😣','😠','😐','😯','😧','😵','😢','😭','😴','🙄','🤔','😬','🤐','🤒'];
 var tasksprites = {
     "move": "🚶🏻",
     "action": "🤺",
@@ -17,6 +18,7 @@ var tasksprites = {
 
 var canvas, context;
 var lasttick = 0;
+var paused = false;
 var units = [];
 var queue = new Queue();
 var activeItem;
@@ -28,7 +30,7 @@ function getNextActiveUnit() {
 
 function update() {
     
-    if (lasttick + 500 < Date.now()) {
+    if (lasttick + 500 < Date.now() && !paused) {
         if (activeItem) {
             if (activeItem instanceof Unit) {
                 queue.add(activeItem.turn());
@@ -38,9 +40,7 @@ function update() {
             }
             activeItem = null;
         }
-        else {
-            activeItem = queue.tick();
-        }
+        activeItem = queue.tick();
         lasttick = Date.now();
     }
 
@@ -61,8 +61,32 @@ function draw() {
     }
 
     if (activeItem) {
-        context.fillStyle = "rgba(0,255,255,0.8)";
-        context.fillRect(activeItem.x * 40, activeItem.y * 40, 40, 40);
+        var unit;
+        if (activeItem instanceof Unit) {
+            unit = activeItem;
+        }
+        if (activeItem.unit) {
+            unit = activeItem.unit;
+        }
+
+        if (unit.moveNodes) {
+            context.fillStyle = "rgba(0, 0, 255, 0.8)";
+            unit.moveNodes.forEach(function(node) {
+                context.fillRect(node.x * 40, node.y * 40, 40, 40);
+            });
+        }
+
+        if (unit.path) {
+            context.fillStyle = "rgba(255, 255, 255, 0.4)";
+            unit.path.nodes.forEach(function(node) {
+                context.fillRect(node.x * 40, node.y * 40, 40, 40);
+            });
+        }
+
+        if (unit) {
+            context.fillStyle = "rgba(0,255,255,0.4)";
+            context.fillRect(unit.x * 40, unit.y * 40, 40, 40);
+        }
     }
 
     units.forEach(function(unit) {
@@ -78,15 +102,19 @@ function init() {
     units.push(new Unit(0, 1, 0));
     units.push(new Unit(0, 0, 1));
 
-    units.push(new Unit(0, 11, 11));
-    units.push(new Unit(0, 10, 11));
-    units.push(new Unit(0, 11, 10));
+    units.push(new Unit(1, 11, 11));
+    units.push(new Unit(1, 10, 11));
+    units.push(new Unit(1, 11, 10));
 
     units.forEach(function(unit) {
         queue.add(unit);
     });
 
     window.requestAnimationFrame(update);
+}
+
+function pause() {
+    paused = true;
 }
 
 window.onload = function() {
