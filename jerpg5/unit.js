@@ -13,6 +13,7 @@ class Unit {
         this.moved = false;
         this.acted = false;
         this.moveNodes = null;
+        this.diamond = null;
         this.path = null;
     }
 
@@ -26,7 +27,12 @@ class Unit {
         if (!this.moved && !this.acted) {
             this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange);
             this.action = getBestAction(this);
-            
+            this.diamond = createDiamond(
+                this.action.actiontemplate.range,
+                this.action.node.x,
+                this.action.node.y,
+                this.action.actiontemplate.center);
+
             if (this.action.requiresMove) {
                 this.path = getPath(this.action.node);
                 var task = new Task("move", this, 999, function(unit) { //task invoke
@@ -51,6 +57,7 @@ class Unit {
                 }, function(unit) { //task done
                     unit.acted = true;
                     unit.action = null;
+                    unit.diamond = null;
                 });
             }
         }
@@ -78,6 +85,11 @@ class Unit {
         else if (!this.acted) {
             this.moveNodes = [new MoveNode(this.x, this.y, 0, null, 0)];
             this.action = getBestAction(this);
+            this.diamond = createDiamond(
+                this.action.actiontemplate.range,
+                this.action.node.x,
+                this.action.node.y,
+                this.action.actiontemplate.center);
 
             var task = new Task("action", this, 999, function(unit) { //task invoke
                 unit.action.invoke();
@@ -85,6 +97,7 @@ class Unit {
             }, function(unit) { //task done
                 unit.acted = true;
                 unit.action = null;
+                unit.diamond = null;
             });
         }
         else {
@@ -210,21 +223,12 @@ function getBestAction(unit) {
         unitMap[node.x][node.y] = unit;
 
         unit.actions.forEach(function(actiontemplate) {
-            var diamond = createDiamond(actiontemplate.range, false);
+            var diamond = createDiamond(actiontemplate.range, node.x, node.y, actiontemplate.center);
 
             diamond.forEach(function(d) {
-                var x = d.x + unit.x;
-                var y = d.y + unit.y;
-
-                if (x < 0 || y < 0 || x >= 12 || y >= 12) {
-                    return;
-                }
-
-                var r = { x, y };
-
-                var targetList = getTargetList(actiontemplate, r, unitMap);
+                var targetList = getTargetList(actiontemplate, d, unitMap);
                 var score = calculateActionScore(actiontemplate, unit, targetList);
-                actionList.push(new Action(actiontemplate, unit, node, r, score));
+                actionList.push(new Action(actiontemplate, unit, node, d, score));
             });
         });
     });
@@ -242,15 +246,29 @@ function getBestMove(unit) {
 
 }
 
-function createDiamond(radius, center = false) {
+/**
+ *  @param {int} radius - the radius of the diamond
+ *  @param {int} centerx - the center x of the diamond
+ *  @param {int} centery - the center y of the diamond
+ *  @param {boolean} center - whether or not to include the center tile
+ */
+function createDiamond(radius, centerx, centery, includeCenter) {
     var diamond = [];
 
-    for (var x=-radius; x<=radius; x++) {
-        for (var y=-radius; y<=radius; y++) {
-            if (Math.abs(x) + Math.abs(y) <= radius) {
-                if (!center && x === y && x === 0) {
+    for (var i=-radius; i<=radius; i++) {
+        for (var j=-radius; j<=radius; j++) {
+            if (Math.abs(i) + Math.abs(j) <= radius) {
+                if (!includeCenter && i === j && i === 0) {
                     continue;
                 }
+
+                var x = i + centerx;
+                var y = j + centery;
+
+                if (x < 0 || y < 0 || x >= 12 || y >= 12) {
+                    continue;
+                }
+
                 diamond.push({ x, y });
             }
         }

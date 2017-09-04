@@ -20,13 +20,11 @@ class Action {
     }
 
     invoke() {
-        console.log("invoked action");
-        console.log(this);
-        pause();
+        console.log(this.unit.sprite + " used " + this.actiontemplate.name + " on " + this.target.x + ", " + this.target.y);
     }
 
     draw(ctx) {
-        ctx.fillStyle = "rgba(255,0,0,0.8)";
+        ctx.fillStyle = "rgba(0,255,0,0.9)";
 
         var spread = getSpread(this.actiontemplate.spread, this.target);
         spread.forEach(function(s) {

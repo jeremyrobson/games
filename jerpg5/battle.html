@@ -24,21 +24,25 @@ var actiontemplates = {
         range: 1,
         spread: [{x: 0, y: 0}],
         pow: 2,
+        center: false
     },
     "fire": {
         name: "fire",
         range: 3,
         spread: [{x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: 0}, {x: 0, y: -1}, {x: 0, y: 1}],
-        pow: 1
+        pow: 1,
+        center: true
     }
 };
 
 var canvas, context;
+var mx, my, tx, ty;
 var lasttick = 0;
 var paused = false;
 var units = [];
 var queue = new Queue();
 var activeItem;
+var selunit;
 
 
 function getUnitByPosition(x, y) {
@@ -67,6 +71,13 @@ function update() {
     window.requestAnimationFrame(update);
 }
 
+function mouse_down(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+    tx = Math.floor(mx / 40);
+    ty = Math.floor(my / 40);
+}
+
 function draw() {
     context.clearRect(0, 0, 640, 480);
 
@@ -92,6 +103,13 @@ function draw() {
             context.fillStyle = "rgba(0, 0, 255, 0.8)";
             unit.moveNodes.forEach(function(node) {
                 context.fillRect(node.x * 40, node.y * 40, 40, 40);
+            });
+        }
+
+        if (unit.diamond) {
+            context.fillStyle = "rgba(255, 0, 0, 0.9)";
+            unit.diamond.forEach(function(d) {
+                context.fillRect(d.x * 40, d.y * 40, 40, 40);
             });
         }
 
@@ -141,10 +159,16 @@ function pause() {
     console.log("paused!");
 }
 
+function unpause() {
+    paused = false;
+}
+
 window.onload = function() {
     canvas = document.getElementById("canvas");
     context = canvas.getContext("2d");
     context.textBaseline = "top";
+
+    canvas.onmousedown = mouse_down;
 
     init();
 };
