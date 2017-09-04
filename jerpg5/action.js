@@ -28,9 +28,9 @@ class Action {
     draw(ctx) {
         ctx.fillStyle = "rgba(255,0,0,0.8)";
 
-        var targetList = getTargetList(this.actiontemplate, this.target);
-        targetList.forEach(function(target) {
-            ctx.fillRect(target.x * 40, target.y * 40, 40, 40);
+        var spread = getSpread(this.actiontemplate.spread, this.target);
+        spread.forEach(function(s) {
+            ctx.fillRect(s.x * 40, s.y * 40, 40, 40);
         });
     }
 }

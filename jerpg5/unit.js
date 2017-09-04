@@ -4,6 +4,7 @@ class Unit {
         this.x = x;
         this.y = y;
         this.sprite = sprites[Math.floor(Math.random() * sprites.length)];
+        this.actions = [actiontemplates["melee"], actiontemplates["fire"]];
         this.agl = Math.floor(Math.random() * 9) + 1;
         this.CT = 0;
         this.CTR = 0; // Math.ceil(100 / this.agl);
@@ -204,25 +205,27 @@ function getPath(node) {
 function getBestAction(unit) {
     var actionList = [];
     unit.moveNodes.forEach(function(node, i) {
-        var rangeList = [
-            {x: node.x - 1, y: node.y},
-            {x: node.x + 1, y: node.y},
-            {x: node.x, y: node.y - 1},
-            {x: node.x, y: node.y + 1},
-        ];
-        rangeList.forEach(function(r) {
-            var actiontemplate = "melee";
+        var unitMap = createUnitMap(); //todo: create single unitMap and clone
+        unitMap[unit.x][unit.y] = null;
+        unitMap[node.x][node.y] = unit;
 
-            if (r.x === unit.x && r.y === unit.y && i > 0) {
-                //if i > 0 then the unit has moved before invoking this action
-                //if r.xy === unit.xy then it is attempting to invoke an action
-                //on its former position post-move, which is a no-no
-            }
-            else {
-                var targetList = getTargetList(actiontemplate, r);
+        unit.actions.forEach(function(actiontemplate) {
+            var diamond = createDiamond(actiontemplate.range, false);
+
+            diamond.forEach(function(d) {
+                var x = d.x + unit.x;
+                var y = d.y + unit.y;
+
+                if (x < 0 || y < 0 || x >= 12 || y >= 12) {
+                    return;
+                }
+
+                var r = { x, y };
+
+                var targetList = getTargetList(actiontemplate, r, unitMap);
                 var score = calculateActionScore(actiontemplate, unit, targetList);
                 actionList.push(new Action(actiontemplate, unit, node, r, score));
-            }
+            });
         });
     });
 
@@ -239,14 +242,46 @@ function getBestMove(unit) {
 
 }
 
-function getTargetList(actiontemplate, r) {
-    var spread = [r]; //getSpread(actiontemplate.spread, r);
+function createDiamond(radius, center = false) {
+    var diamond = [];
+
+    for (var x=-radius; x<=radius; x++) {
+        for (var y=-radius; y<=radius; y++) {
+            if (Math.abs(x) + Math.abs(y) <= radius) {
+                if (!center && x === y && x === 0) {
+                    continue;
+                }
+                diamond.push({ x, y });
+            }
+        }
+    }
+
+    return diamond;
+}
+
+function getSpread(spreadtemplate, r) {
+    var spread = [];
+
+    spreadtemplate.forEach(function(s) {
+        var x = s.x + r.x;
+        var y = s.y + r.y;
+
+        if (x < 0 || y < 0 || x >= 12 || y >= 12) {
+            return;
+        }
+
+        spread.push({ x, y });
+    });
+
+    return spread;
+}
+
+function getTargetList(actiontemplate, r, unitMap) {
+    var spread = getSpread(actiontemplate.spread, r);
     var targetList = [];
 
-    //actiontemplate.spread.forEach()
-
     spread.forEach(function(s) {
-        var unit = getUnitByPosition(s.x, s.y);
+        var unit = unitMap[s.x][s.y];
         if (unit) {
             targetList.push(unit);
         }
@@ -268,7 +303,7 @@ function calculateActionScore(actiontemplate, unit, targetList) {
 function calculateDamage(actiontemplate, unit, r) {
     var damage = 0;
 
-    damage = Math.floor(Math.random() * 6) + Math.floor(Math.random() * 6) + 2;
+    damage = actiontemplate.pow;
 
     return damage;
 }

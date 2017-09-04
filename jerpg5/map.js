@@ -18,3 +18,13 @@ function createTileMap(width, height, defaultValue) {
     }
     return binaryMap;
 }
+
+function createUnitMap() {
+    var unitMap = createTileMap(12, 12, null);
+
+    units.forEach(function(unit) {
+        unitMap[unit.x][unit.y] = unit;
+    });
+
+    return unitMap;
+}
