@@ -3,6 +3,10 @@
 
 <head>
 
+<script src="color.js"></script>
+<script src="layer.js"></script>
+<script src="animation.js"></script>
+<script src="textball.js"></script>
 <script src="task.js"></script>
 <script src="queue.js"></script>
 <script src="movenode.js"></script>
@@ -11,7 +15,6 @@
 <script src="map.js"></script>
 <script>
 
-var sprites = ['😁','😃','😅','😎','😍','😆','🙃','😉','😜','🤓','🤠','😒','😟','😣','😠','😐','😯','😧','😵','😢','😭','😴','🙄','🤔','😬','🤐','🤒'];
 var tasksprites = {
     "move": "🚶🏻",
     "action": "🤺",
@@ -24,18 +27,21 @@ var actiontemplates = {
         range: 1,
         spread: [{x: 0, y: 0}],
         pow: 2,
-        center: false
+        center: false,
+        sprite: "🗡"
     },
     "fire": {
         name: "fire",
         range: 3,
         spread: [{x: -1, y: 0}, {x: 1, y: 0}, {x: 0, y: 0}, {x: 0, y: -1}, {x: 0, y: 1}],
         pow: 1,
-        center: true
+        center: true,
+        sprite: "🔥"
     }
 };
 
 var canvas, context;
+var layer2;
 var mx, my, tx, ty;
 var lasttick = 0;
 var paused = false;
@@ -66,6 +72,8 @@ function update() {
         activeItem = queue.tick();
         lasttick = Date.now();
     }
+
+    layer2.update();
 
     draw();
     window.requestAnimationFrame(update);
@@ -134,18 +142,21 @@ function draw() {
         unit.draw(context);
     });
 
+    layer2.draw(context);
+
     queue.draw(context);
 }
 
 function init() {
+    layer2 = new Layer();
 
-    units.push(new Unit(0, 0, 0));
-    units.push(new Unit(0, 1, 0));
-    units.push(new Unit(0, 0, 1));
+    units.push(new Unit(0, 0, 0, "😀"));
+    units.push(new Unit(0, 1, 0, "😎"));
+    units.push(new Unit(0, 0, 1, "🤠"));
 
-    units.push(new Unit(1, 11, 11));
-    units.push(new Unit(1, 10, 11));
-    units.push(new Unit(1, 11, 10));
+    units.push(new Unit(1, 11, 11,"😡"));
+    units.push(new Unit(1, 10, 11,"😈"));
+    units.push(new Unit(1, 11, 10,"👹"));
 
     units.forEach(function(unit) {
         queue.add(unit);

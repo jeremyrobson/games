@@ -21,6 +21,15 @@ class Action {
 
     invoke() {
         console.log(this.unit.sprite + " used " + this.actiontemplate.name + " on " + this.target.x + ", " + this.target.y);
+
+        var unitMap = createUnitMap();
+        var targetList = getTargetList(this.actiontemplate, this.target, unitMap);
+        targetList.forEach(function(unit) {
+            var damage = calculateDamage(this.actiontemplate, this.unit, this.target);
+            unit.applyDamage(damage);
+            layer2.add(new Animation(unit.x * 40, unit.y * 40, 32, this.actiontemplate.sprite));
+            layer2.add(new TextBall(unit.x * 40, unit.y * 40, 24, new Color(255, 255, 255, 1.0), damage));
+        }, this);
     }
 
     draw(ctx) {

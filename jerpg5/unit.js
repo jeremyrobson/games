@@ -1,10 +1,11 @@
 class Unit {
-    constructor(team, x, y) {
+    constructor(team, x, y, sprite) {
         this.team = team;
         this.x = x;
         this.y = y;
-        this.sprite = sprites[Math.floor(Math.random() * sprites.length)];
+        this.sprite = sprite;
         this.actions = [actiontemplates["melee"], actiontemplates["fire"]];
+        this.hp = 100;
         this.agl = Math.floor(Math.random() * 9) + 1;
         this.CT = 0;
         this.CTR = 0; // Math.ceil(100 / this.agl);
@@ -116,6 +117,13 @@ class Unit {
         this.CT = 0;
         this.moved = false;
         this.acted = false;
+    }
+
+    applyDamage(damage) {
+        this.hp -= damage;
+        if (this.hp < 0) {
+            this.hp = 0;
+        }
     }
 
     move(x, y) {
@@ -237,8 +245,6 @@ function getBestAction(unit) {
         return b.score - a.score;
     });
 
-    console.log(actionList);
-
     return actionList[0];
 }
 
@@ -277,12 +283,12 @@ function createDiamond(radius, centerx, centery, includeCenter) {
     return diamond;
 }
 
-function getSpread(spreadtemplate, r) {
+function getSpread(spreadtemplate, d) {
     var spread = [];
 
     spreadtemplate.forEach(function(s) {
-        var x = s.x + r.x;
-        var y = s.y + r.y;
+        var x = s.x + d.x;
+        var y = s.y + d.y;
 
         if (x < 0 || y < 0 || x >= 12 || y >= 12) {
             return;
@@ -294,8 +300,8 @@ function getSpread(spreadtemplate, r) {
     return spread;
 }
 
-function getTargetList(actiontemplate, r, unitMap) {
-    var spread = getSpread(actiontemplate.spread, r);
+function getTargetList(actiontemplate, d, unitMap) {
+    var spread = getSpread(actiontemplate.spread, d);
     var targetList = [];
 
     spread.forEach(function(s) {
@@ -318,7 +324,7 @@ function calculateActionScore(actiontemplate, unit, targetList) {
     return score;
 }
 
-function calculateDamage(actiontemplate, unit, r) {
+function calculateDamage(actiontemplate, unit, target) {
     var damage = 0;
 
     damage = actiontemplate.pow;
