@@ -1,5 +1,6 @@
 class Unit {
     constructor(team, x, y, sprite) {
+        this.id = Math.floor(Math.random() * 100000000);
         this.team = team;
         this.x = x;
         this.y = y;
@@ -24,9 +25,10 @@ class Unit {
 
     turn() {
         var task = null;
+        var safetyScores = getSafetyScores(this, units);
 
         if (!this.moved && !this.acted) {
-            this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange);
+            this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange, safetyScores);
             this.action = getBestAction(this);
             this.diamond = createDiamond(
                 this.action.actiontemplate.range,
@@ -63,7 +65,7 @@ class Unit {
             }
         }
         else if (!this.moved) {
-            this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange);
+            this.moveNodes = getMoveNodes(this, this.x, this.y, this.moverange, safetyScores);
 
             //todo: move to safest node, not random one
             var randomNode = this.moveNodes[Math.floor(Math.random() * this.moveNodes.length)];
@@ -146,9 +148,9 @@ class Unit {
     }
 }
 
-function getMoveNodes(unit, startX, startY, range) {
+function getMoveNodes(unit, startX, startY, moverange, safetyScores) {
     var moveNodes = [];
-    var binaryMap = createTileMap(12, 12, 0);
+    var binaryMap = createTileMap(WIDTH, HEIGHT, 0);
     var objectMap = createObjectMap();
 
     var startNode = new MoveNode(startX, startY, 0, null, 0);
@@ -163,7 +165,7 @@ function getMoveNodes(unit, startX, startY, range) {
     while (i < moveNodes.length) {
 
         var steps = moveNodes[i].steps + 1;
-        if (steps > range) {
+        if (steps > moverange) {
             i++;
             continue;
         }
@@ -192,7 +194,7 @@ function getMoveNodes(unit, startX, startY, range) {
                 }
             }
 
-            moveNodes.push(new MoveNode(x, y, steps, moveNodes[i], 0));
+            moveNodes.push(new MoveNode(x, y, steps, moveNodes[i], safetyScores[x][y]));
         }
 
         i++;
@@ -236,6 +238,7 @@ function getBestAction(unit) {
             diamond.forEach(function(d) {
                 var targetList = getTargetList(actiontemplate, d, unitMap);
                 var score = calculateActionScore(actiontemplate, unit, targetList);
+                score += node.safetyScore;
                 actionList.push(new Action(actiontemplate, unit, node, d, score));
             });
         });
@@ -271,7 +274,7 @@ function createDiamond(radius, centerx, centery, includeCenter) {
                 var x = i + centerx;
                 var y = j + centery;
 
-                if (x < 0 || y < 0 || x >= 12 || y >= 12) {
+                if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
                     continue;
                 }
 
@@ -290,7 +293,7 @@ function getSpread(spreadtemplate, d) {
         var x = s.x + d.x;
         var y = s.y + d.y;
 
-        if (x < 0 || y < 0 || x >= 12 || y >= 12) {
+        if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
             return;
         }
 
@@ -318,7 +321,12 @@ function calculateActionScore(actiontemplate, unit, targetList) {
     var score = 0;
 
     targetList.forEach(function(target) {
-        score += calculateDamage(actiontemplate, unit, target);
+        if (unit.team === target.team) {
+            score -= calculateDamage(actiontemplate, unit, target);
+        }
+        else {
+            score += calculateDamage(actiontemplate, unit, target);
+        }
     });
 
     return score;

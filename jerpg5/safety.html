@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var canvas, context;
+var tiles;
+var units;
+var colors = ["rgb(255, 0, 255)", "rgb(0, 255, 255)"];
+var sprites = ["o", "x"];
+var gradient;
+const WIDTH = 32;
+const HEIGHT = 24;
+
+var safetyScores;
+
+/**
+ *  @param {int} radius - the radius of the diamond
+ *  @param {int} centerx - the center x of the diamond
+ *  @param {int} centery - the center y of the diamond
+ *  @param {boolean} center - whether or not to include the center tile
+ */
+ function createDiamond(radius, centerx, centery, includeCenter) {
+    var diamond = [];
+
+    for (var i=-radius; i<=radius; i++) {
+        for (var j=-radius; j<=radius; j++) {
+            if (Math.abs(i) + Math.abs(j) <= radius) {
+                if (!includeCenter && i === j && i === 0) {
+                    continue;
+                }
+
+                var x = i + centerx;
+                var y = j + centery;
+
+                if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
+                    continue;
+                }
+
+                diamond.push({ x, y });
+            }
+        }
+    }
+
+    return diamond;
+}
+
+function createGradient() {
+    var gradient = [];
+    for (var i=0; i<128; i++) {
+        gradient[i] = "rgb(" + i*2 + ",255,0)";
+    }
+    for (var i=0; i<128; i++) {
+        gradient[i+128] = "rgb(255," + (255-i*2) + ",0)";
+    }
+    return gradient;
+}
+
+function getSafetyScores(unit, units) {
+    var ss = [];
+    var min = 0;
+    var max = 0;
+
+    for (var i=0; i<WIDTH; i++) {
+        ss[i] = [];
+        for (var j=0; j<HEIGHT; j++) {
+            var score = 0;
+            units.forEach(function(u) {
+                var dx = i - u.x;
+                var dy = j - u.y;
+                var distance = Math.sqrt(dx * dx + dy * dy);
+                var invsqrt = 1 / distance;
+                if (distance === 0) {
+                    invsqrt = 1;
+                }
+                if (unit.team === u.team) {
+                    invsqrt;
+                }
+                else {
+                    invsqrt = -invsqrt;
+                }
+                score += invsqrt;
+            });
+
+            ss[i][j] = score;
+
+            if (score < min) {
+                min = score;
+            }
+
+            if (score > max) {
+                max = score + Number.EPSILON;
+            }
+        }
+    }
+
+    for (var i=0; i<WIDTH; i++) {
+        for (var j=0; j<HEIGHT; j++) {
+            ss[i][j] = (ss[i][j] - min) / (max - min);
+        }
+    }
+
+    return ss;
+}
+
+function update() {
+
+    draw();
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+
+    tiles.forEach(function(tile) {
+        var c = Math.floor(tile.moveScore * 256);
+        context.fillStyle = gradient[c];
+        context.fillRect(tile.x * 20, tile.y * 20, 20, 20);
+    });
+
+
+    units.forEach(function(unit) {
+        context.font = "16px Arial";
+        context.textBaseline = "top";
+        context.fillStyle = colors[unit.team];
+        context.fillText(sprites[unit.team], unit.x * 20, unit.y * 20);
+    });
+
+}
+
+function init() {
+    tiles = [];
+    for (var i=0; i<32; i++) {
+        for (var j=0; j<24; j++) {
+            tiles.push({
+                x: i,
+                y: j,
+                moveScore: 0
+            });
+        }
+    }
+
+    units = [];
+    for (var i=0; i<10; i++) {
+        units.push({
+            "id": Math.floor(Math.random() * 10000000),
+            "team": Math.floor(i / 5),
+            "x": Math.floor(Math.random() * 32),
+            "y": Math.floor(Math.random() * 24)
+        });
+    }
+
+    gradient = createGradient();
+
+    safetyScores = getSafetyScores(units[0], units);
+
+    tiles.forEach(function(tile) {
+        tile.moveScore += safetyScores[tile.x][tile.y];
+    });
+
+    window.requestAnimationFrame(update);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+
+    init();
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>

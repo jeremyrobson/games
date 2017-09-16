@@ -12,7 +12,6 @@ function clamp(val, min, max) {
     return val;
 }
 
-
 class Color {
 
     /**
@@ -39,4 +38,15 @@ class Color {
     toString() {
         return "rgba(" + this.r + "," + this.g + "," + this.b + "," + this.a + ")";
     }
+}
+
+function createGradient() {
+    var gradient = [];
+    for (var i=0; i<128; i++) {
+        gradient[i] = "rgb(255," + i*2 + ",0)";
+    }
+    for (var i=0; i<128; i++) {
+        gradient[i+128] = "rgb(" + (255-i*2) + ",255,0)";
+    }
+    return gradient;
 }

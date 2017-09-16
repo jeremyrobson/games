@@ -41,6 +41,8 @@ var actiontemplates = {
 };
 
 var canvas, context;
+var WIDTH = 12;
+var HEIGHT = 12;
 var layer2;
 var mx, my, tx, ty;
 var lasttick = 0;
@@ -49,6 +51,7 @@ var units = [];
 var queue = new Queue();
 var activeItem;
 var selunit;
+var gradient;
 
 
 function getUnitByPosition(x, y) {
@@ -89,8 +92,8 @@ function mouse_down(e) {
 function draw() {
     context.clearRect(0, 0, 640, 480);
 
-    for (var x=0; x<12; x++) {
-        for (var y=0; y<12; y++) {
+    for (var x=0; x<WIDTH; x++) {
+        for (var y=0; y<HEIGHT; y++) {
             if ((x & 1) ^ (y & 1)) {
                 context.fillStyle = "rgb(200, 200, 200)";
                 context.fillRect(x * 40, y * 40, 40, 40);
@@ -108,18 +111,21 @@ function draw() {
         }
 
         if (unit.moveNodes) {
-            context.fillStyle = "rgba(0, 0, 255, 0.8)";
             unit.moveNodes.forEach(function(node) {
+                var c = Math.floor(node.safetyScore * 256);
+                context.fillStyle = gradient[c];
                 context.fillRect(node.x * 40, node.y * 40, 40, 40);
             });
         }
 
+        /*
         if (unit.diamond) {
             context.fillStyle = "rgba(255, 0, 0, 0.9)";
             unit.diamond.forEach(function(d) {
                 context.fillRect(d.x * 40, d.y * 40, 40, 40);
             });
         }
+        */
 
         if (unit.path) {
             context.fillStyle = "rgba(255, 255, 255, 0.4)";
@@ -161,6 +167,8 @@ function init() {
     units.forEach(function(unit) {
         queue.add(unit);
     });
+
+    gradient = createGradient();
 
     window.requestAnimationFrame(update);
 }
