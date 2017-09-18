@@ -1,0 +1,369 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+const SPRITE_X_OFFSET = 320;
+const SPRITE_Y_OFFSET = 120;
+const CONSOLE_X_OFFSET = 320;
+const CONSOLE_Y_OFFSET = 380;
+
+var canvas, context;
+var party, enemies, units;
+var queue;
+var state = "select_action";
+var activeUnit = null;
+var activeTurn = null;
+var global_button;
+var paused;
+
+class Unit {
+    constructor(team, x, y, sprite, color) {
+        this.id = Math.floor(Math.random() * 100000000);
+        this.team = team;
+        this.x = x;
+        this.y = y;
+        this.maxhp = Math.floor(Math.random() * 50) + 25;
+        this.hp = this.maxhp;
+        this.str = Math.floor(Math.random() * 5) + 3;
+        this.agl = Math.floor(Math.random() * 5) + 3;
+        this.sprite = sprite;
+        this.turn = null;
+        this.color = color;
+    }
+
+    reset() {
+        this.turn = null;
+        this.action = null;
+    }
+
+    draw(ctx) {
+        var dx = this.team * SPRITE_X_OFFSET + this.x * 40;
+        var dy = SPRITE_Y_OFFSET + this.y * 40;
+
+        ctx.save();
+
+        if ((activeUnit && activeUnit.id == this.id) || (activeTurn && activeTurn.unit.id == this.id)) {
+            ctx.shadowColor = this.color;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.shadowBlur = 32;
+        }
+
+        ctx.font = "32px Arial";
+        ctx.fillStyle = "rgb(255,255,255)";
+        ctx.fillText(this.sprite, dx, dy);
+        ctx.restore();
+    }
+}
+
+class Action {
+    constructor(type, target) {
+        this.type = type;
+        this.target = target;
+        this.spread = [[-1,0],[0,-1],[0,0],[1,0],[0,1]];
+        this.color = "rgb(255,0,0)";
+        this.time = 100;
+        this.done = false;
+        this.targetList = null;
+    }
+
+    getNextTarget() {
+        var s = this.spread.shift();
+        var x = this.target.x + s[0];
+        var y = this.target.y + s[1];
+        return selectUnit(this.target.team, x, y);
+    }
+
+    invoke(actor, target) {
+        var damage = 10;
+        target.hp -= damage;
+        console.log(actor.sprite + " used " + this.type + " on " + target.sprite);
+    }
+
+    update(actor) {
+        this.time--;
+        if (this.time <= 0) {
+            var nextTarget = null;
+            if (nextTarget = this.getNextTarget()) {
+                this.invoke(actor, nextTarget);
+                this.time = 100;
+            }
+        }
+        
+        if (this.spread.length == 0) {
+            this.done = true;
+        }
+    }
+
+    draw(ctx) {
+        activeUnit.action.spread.forEach(function(s) {
+            var dx = this.target.team * SPRITE_X_OFFSET + (this.target.x + s[0]) * 40;
+            var dy = SPRITE_Y_OFFSET + (this.target.y + s[1]) * 40;
+            ctx.fillStyle = this.color;
+            ctx.fillRect(dx, dy, 40, 40);
+        }, this);
+    }
+}
+
+class Turn {
+    constructor(unit) {
+        this.unit = unit;
+        this.targetList = null;
+        this.done = false;
+    }
+
+    invoke() {
+
+    }
+
+    update() {
+        var unit = this.unit;
+        if (!unit.action.done) {
+            unit.action.update(unit);
+        }
+        else {
+            this.done = true;
+        }
+    }
+
+    draw(ctx) {
+
+    }
+}
+
+function selectUnit(team, x, y) {
+    return units.filter(function(unit) {
+        return unit.team == team && unit.x == x && unit.y == y;
+    })[0];
+}
+
+function selectTarget(mx, my) {
+    var team = Math.floor(mx / SPRITE_X_OFFSET);
+
+    mx = mx - team * SPRITE_X_OFFSET;
+    my = my - SPRITE_Y_OFFSET;
+
+    var x = Math.floor(mx / 40);
+    var y = Math.floor(my / 40);
+    var unit = selectUnit(team, x, y);
+
+    activeUnit.action.target = {
+        team, unit, x, y
+    };
+}
+
+function state_select_action(button) {
+    activeUnit = party.find(function(unit) {
+        return unit.turn == null;
+    });
+
+    if (button == "attack") {
+        //option to auto select target to skip target select state
+        activeUnit.action = new Action("attack", null);
+    }
+
+    if (button == "cancel" && queue.length > 0) {
+        var previousTurn = queue.pop();
+        activeUnit = previousTurn.unit;
+        activeUnit.reset();
+    }
+
+    if (activeUnit && activeUnit.action) {
+        state = "select_target";
+    }
+
+    if (!activeUnit) {
+        state = "done";
+    }
+}
+
+function state_select_target(button) {
+    if (button == "cancel") {
+        state = "select_action";
+        activeUnit.action = null;
+    }
+
+    if (activeUnit.action && activeUnit.action.target) {
+        state = "confirm";
+    }
+}
+
+function state_confirm(button) {
+    if (button == "confirm") {
+        activeUnit.turn = new Turn(activeUnit);
+        queue.push(activeUnit.turn);
+        activeUnit = null;
+        state = "select_action";
+    }
+
+    if (button == "cancel") {
+        activeUnit.action.target = null;
+        state = "select_target";
+    }
+}
+
+function state_done(button) {
+    enemies.forEach(function(unit) {
+        unit.action = new Action("attack", party[0]);
+        unit.turn = new Turn(unit);
+        queue.push(unit.turn);
+    });
+
+    queue.sort(function(a, b) {
+        return b.unit.agl - a.unit.agl;
+    });
+
+    state = "commence";
+}
+
+function state_commence(button) {
+    
+    if (!activeTurn) {
+        activeTurn = queue.shift();
+        if (activeTurn) {
+            activeTurn.invoke();
+        }
+        else {
+            state = "select_action";
+        }
+    }
+
+    if (activeTurn) {
+        if (!activeTurn.done) {
+            activeTurn.update();
+        }
+        else {
+            activeTurn.unit.reset();
+            activeTurn = null;
+        }
+    }
+}
+
+function readButton() {
+    var value = global_button;
+    global_button = "";
+    return value;
+}
+
+function pause() {
+    paused = true;
+}
+
+function update() {
+
+    var button = readButton();
+
+    if (!paused) {
+        switch (state) {
+            case "select_action":
+                state_select_action(button);
+                break;
+            case "select_target":
+                state_select_target(button);
+                break;
+            case "confirm":
+                state_confirm(button);
+                break;
+            case "done":
+                state_done(button);
+                break;
+            case "commence":
+                state_commence(button);
+                break;
+        }
+    }
+
+    draw();
+    window.requestAnimationFrame(update);
+}
+
+function draw() {
+
+    context.clearRect(0, 0, 640, 480);
+
+    if (activeUnit && activeUnit.action && activeUnit.action.target) {
+        activeUnit.action.draw(context);
+    }
+
+    units.forEach(function(unit) {
+        unit.draw(context);
+    });
+
+    party.forEach(function(unit, i) {
+        context.font = "24px Arial";
+        context.fillStyle = "rgb(0,0,0)";
+        context.fillText(unit.sprite + unit.hp + " / " + unit.maxhp, CONSOLE_X_OFFSET, CONSOLE_Y_OFFSET + i * 24);
+    });
+
+    context.fillStyle = "rgb(0,0,0)";
+    context.fillText(state, 0, 0);
+}
+
+function init() {
+    queue = [];
+    party = [], enemies = [], units = [];
+
+    party.push(new Unit(1, 0, 0, "😀", "rgb(0,255,0)"));
+    party.push(new Unit(1, 0, 1, "😎", "rgb(0,255,0)"));
+    party.push(new Unit(1, 0, 2, "🤠", "rgb(0,255,0)"));
+    party.push(new Unit(1, 0, 3, "😵", "rgb(0,255,0)"));
+
+    enemies.push(new Unit(0, 0, 0, "🐍", "rgb(255,0,0)"));
+    enemies.push(new Unit(0, 1, 1, "🦎", "rgb(255,0,0)"));
+    enemies.push(new Unit(0, 2, 2, "🐛", "rgb(255,0,0)"));
+
+    units = party.concat(enemies);
+
+    paused = false;
+
+    window.requestAnimationFrame(update);
+}
+
+function mouse_down(e) {
+    var mx = e.offsetX;
+    var my = e.offsetY;
+
+    if (state == "select_target") {
+        selectTarget(mx, my);
+    }
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+    canvas.onmousedown = mouse_down;
+
+    document.getElementById("attack").onclick = function() {
+        global_button = "attack";
+    };
+
+    document.getElementById("confirm").onclick = function() {
+        global_button = "confirm";
+    };
+
+    document.getElementById("cancel").onclick = function() {
+        global_button = "cancel";
+    };
+
+    init();
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+<button id="attack">attack</button>
+<button id="confirm">confirm</button>
+<button id="cancel">cancel</button>
+
+</body>
+
+</html>
