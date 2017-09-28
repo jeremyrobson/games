@@ -1,0 +1,130 @@
+<!doctype html>
+
+<html>
+
+<head>
+
+<script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+<script src="spell.js"></script>
+<script>
+
+var spell;
+var _sp = 10000;
+var cells;
+
+function update() {
+    var element = document.getElementById("element");
+    element.innerHTML = spell.element;
+
+    var sp = document.getElementById("sp");
+    sp.innerHTML = _sp;
+
+    $(".spellcell").css("background-color", "white");
+    spell.spread.forEach(function(s) {
+        cells[s[1]][s[0]].css("background-color", "cyan");
+    });
+}
+
+function addSpread(x, y) {
+    if (spell.isSpreadAvailable(x, y)) {
+        if (_sp > spell.getSpreadAddCost()) {
+            _sp -= spell.addSpread(x, y);
+        }
+    }
+    else {
+        removeSpread(x, y);
+    }
+    update();
+}
+
+function removeSpread(x, y) {
+    _sp += spell.removeSpread(x, y);
+    update();
+}
+
+function upgradeElement() {
+    if (_sp > spell.getElementUpgradeCost()) {
+        _sp -= spell.upgradeElement();
+    }
+    update();
+}
+
+function downgradeElement() {
+    _sp += spell.downgradeElement();
+    update();
+}
+
+$(document).ready(function() {
+    cells = [];
+    for (var y=0; y<5; y++) {
+        cells[y] = [];
+        var row = $("<tr></tr>");
+        for (var x=0; x<5; x++) {
+            var cell = $("<td>0</td>")
+            .data("x", x)
+            .data("y", y)
+            .addClass("spellcell")
+            .css("cursor", "pointer")
+            .hover(function() {
+                update();
+                $(this).css("background-color", "blue");
+            })
+            .click(function() {
+                var x = $(this).data("x");
+                var y = $(this).data("y");
+                addSpread(x, y);
+            });
+            row.append(cell);
+            
+            cells[y][x] = cell;
+        }
+        $("#spread-table > tbody").append(row);
+    }
+
+    spell = new Spell();
+    update();
+});
+
+</script>
+
+</head>
+
+<body>
+
+<h1>Spell Craft</h1>
+
+<h2>SP: <span id="sp"></span></h2>
+
+<div>
+    <h2>Spread</h2>
+    <table id="spread-table" style="border: 1px; border-style: solid;">
+        <thead>
+
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+</div>
+
+<div>
+    <h2>Element <span id="element"></span></h2>
+    <button onclick="upgradeElement()">Upgrade</button>
+    <button onclick="downgradeElement()">Downgrade</button>
+</div>
+
+<div>
+    <h2>Defensive Effect: <span id="effect">None</span></h2>
+    <button onclick="upgradeEffect">Upgrade</button>
+    <button onclick="downgradeEffect">Downgrade</button>
+</div>
+
+<div>
+    <h2>Turns: <span id="turns">0</span></h2>
+    <button onclick="upgradeTurns">Upgrade</button>
+    <button onclick="downgradeTurns">Downgrade</button>
+</div>
+
+</body>
+
+</html>
