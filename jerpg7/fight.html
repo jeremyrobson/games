@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+var choices = ["dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "dude", "maxhp", "range", "power", "defense", "speed"];
+
+class Player {
+    constructor(id, x, y, color) {
+        this.id = id;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.dude = {
+            "maxhp": 30,
+            "range": 1,
+            "power": 1,
+            "defense": 0,
+            "speed": 1
+        }
+        this.gold = 100;
+        this.choice = null;
+    }
+
+    loop() {
+        this.gold++;
+
+        if (!this.choice) {
+            this.choice = choices[Math.floor(Math.random() * choices.length)];
+            console.log("player " + this.id + "'s choice is " + this.choice);
+        }
+
+        switch (this.choice) {
+            case "dude":
+                if (this.gold > 100) {
+                    this.buyDude(100);
+                    this.choice = null;
+                }
+                break;
+            case "power":
+                if (this.gold > this.dude.power * 100) {
+                    this.upgrade("power", 1, this.dude.power * 100);
+                    this.choice = null;
+                }
+                break;
+            case "speed":
+                if (this.gold > this.dude.speed * 100) {
+                    this.upgrade("speed", 1, this.dude.speed * 100);
+                    this.choice = null;
+                }
+            case "defense":
+                if (this.gold > this.dude.defense * 100) {
+                    this.upgrade("defense", 1, this.dude.defense * 100);
+                    this.choice = null;
+                }
+                break;
+            case "range":
+                if (this.gold > this.dude.range * 100) {
+                    this.upgrade("range", 1, this.dude.range * 100);
+                    this.choice = null;
+                }
+                break;
+            case "maxhp":
+                if (this.gold > this.dude.maxhp * 10) {
+                    this.upgrade("maxhp", 10, this.dude.maxhp * 10);
+                    this.choice = null;
+                }
+                break;
+        }
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 32, 32);
+    }
+
+    buyDude(cost) {
+        this.gold -= cost;
+        dudes.push(new Dude(this, this.x, this.y));
+    }
+
+    upgrade(stat, value, cost) {
+        this.dude[stat] += value;
+        this.gold -= cost;
+        console.log("upgrade complete");
+    }
+}
+
+class Dude {
+    constructor(player, x, y) {
+        this.player = player;
+        this.x = x + Math.random() * 32;
+        this.y = y + Math.random() * 32;
+        this.color = player.color;
+        this.update();
+        this.hp = this.maxhp;
+        this.life = 500;
+    }
+
+    update() {
+        this.maxhp = this.player.dude.maxhp;
+        this.range = this.player.dude.range;
+        this.power = this.player.dude.power;
+        this.speed = this.player.dude.speed;
+        this.defense = this.player.dude.defense;
+    }
+
+    loop() {
+        this.update();
+
+        if (this.hp > 0) {
+            var targets = dudes.filter(function(d) {
+                return d.player.id !== this.player.id && d.hp > 0;
+            }, this);
+
+            var dude = this;
+            targets.sort(function(a, b) {
+                return a.getDistance(dude) - b.getDistance(dude); //shortest distance
+            });
+
+            this.target = targets[0];
+
+            if (this.target) {
+                this.move();
+                this.fight();
+            }
+        }
+        else {
+            this.life -= 1;
+        }
+    }
+
+    move() {
+        var angle = Math.atan2(this.target.x - this.x, this.target.y - this.y);
+        var dx = Math.sin(angle) * this.speed;
+        var dy = Math.cos(angle) * this.speed;
+        this.x += dx;
+        this.y += dy;
+    }
+
+    fight() {
+        if (this.getDistance(this.target) <= this.range) {
+            var damage = this.power - this.target.defense;
+            if (damage < 0) {
+                damage = 0;
+            }
+            if (this.target.applyDamage(damage)) {
+                this.player.gold += 10;
+            }
+        }
+    }
+
+    applyDamage(damage) {
+        this.hp -= damage;
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.color = "rgb(0,0,0)";
+            return true;
+        }
+        return false;
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, 8, 8);
+    }
+
+    getDistance(point) {
+        var dx = this.x - point.x;
+        var dy = this.y - point.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+}
+
+var players, dudes;
+
+function loop() {
+
+    players.forEach(function(p) {
+        p.loop();
+    });
+
+    dudes = dudes.filter(function(d) {
+        return d.life > 0;
+    });
+
+    dudes.forEach(function(d) {
+        d.loop();
+    });
+
+    draw();
+
+    window.requestAnimationFrame(loop);
+}
+
+function draw() {
+    context.fillStyle = "rgb(255,255,255)";
+    context.fillRect(0, 0, 640, 480);
+
+    players.forEach(function(p) {
+        p.draw(context);
+    });
+
+    dudes.forEach(function(d) {
+        d.draw(context);
+    })
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+
+    players = [
+        new Player("user", 0, 0, "green"),
+        new Player("cpu", 600, 400, "red")
+    ];
+    dudes = [];
+
+    window.requestAnimationFrame(loop);
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+</html>

@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+class Cluster {
+    constructor() {
+        this.x = Math.floor(Math.random() * 640);
+        this.y = Math.floor(Math.random() * 420);
+        this.height = Math.floor(Math.random() * 25);
+        this.width = this.height * 2;
+        this.w2 = this.width / 2;
+        this.h2 = this.height / 2;
+    }
+
+    loop() {
+        this.x += -0.1;
+        this.y += 0.1;
+        if (this.x < 0) {
+            this.x = 640;
+        }
+        if (this.y > 480) {
+            this.y = 0;
+        }
+
+        if (Math.random() > 0.90) {
+            var x = this.x + Math.random() * this.width - this.w2;
+            var y = this.y + Math.random() * this.height - this.h2;
+            sparkles.push(new Sparkle(x, y, 0));
+        }
+    }
+
+    draw(ctx) {
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "rgba(25, 50, 100, 0.5)";
+        ctx.fillRect(this.x - this.w2, this.y - this.h2, this.width, this.height);
+    }
+}
+
+class Sparkle {
+    constructor(x, y, generation) {
+        this.x0 = x || Math.floor(Math.random() * 640);
+        this.y0 = y || Math.floor(Math.random() * 420);
+        this.life0 = Math.floor(Math.random() * 10) + 10;
+        this.x = this.x0
+        this.y = this.y0
+        this.size = Math.floor(Math.random() * 4) + 2;
+        this.life = this.life0;
+        this.a = Math.random() * 0.1 + 0.9;
+        this.vel = Math.random() * 2 + 2;
+        this.generation = generation;
+    }
+
+    reset() {
+        if (this.x0 < 0) {
+            this.x0 = 640;
+        }
+
+        if (this.y0 > 480) {
+            this.y0 = 0;
+        }
+
+        this.life = this.life0;
+        this.x = this.x0;
+        this.y = this.y0;
+        this.size = Math.floor(Math.random() * 4) + 2;
+    }
+
+    loop(dx, dy) {
+        this.life = this.life - 1;
+        this.x0 += dx - Math.random() * 4;
+        this.y0 += dy;
+        this.x -= this.vel + dx;
+        this.y += dy;
+
+        if (Math.random() > 0.90) {
+            if (this.generation < 3) {
+                sparkles.push(new Sparkle(this.x0, this.y0, this.generation + 1));
+            }
+        }
+    }
+
+    draw(ctx) {
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = "rgba(255, 255, 255, " + this.a + ")";
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+    }
+}
+
+var canvas, context;
+var clusters = [], sparkles = [];
+var gradient;
+var count;
+
+function loop() {
+    context.shadowBlur = 0;
+    context.shadowColor = "rgb(255, 255, 255)";
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 640, 480);
+
+    clusters.forEach(function(c) {
+        c.loop();
+    });
+
+    sparkles = sparkles.filter(function(s) {
+        return s.life > 0;
+    })
+
+    sparkles.push(new Sparkle(0, 0, 0));
+
+    sparkles.forEach(function(s) {
+        s.loop(-0.05, 0.1);
+        s.draw(context);
+    });
+
+    count.innerHTML = sparkles.length;
+
+    window.requestAnimationFrame(loop);
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    count = document.getElementById("count");
+
+    gradient = context.createLinearGradient(0, 0, 640, 480);
+    gradient.addColorStop(0, "rgb(25, 50, 100)");
+    gradient.addColorStop(1, "rgb(50, 100, 150)");
+
+    for (var i=0; i<50; i++) {
+        clusters.push(new Cluster());
+    }
+
+    window.requestAnimationFrame(loop);
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+<div id="count"></div>
+
+</body>
+
+</html>

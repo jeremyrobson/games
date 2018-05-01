@@ -1,0 +1,890 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script src="battlemenu.js"></script>
+<script src="battleaction.js"></script>
+<script src="movetree.js"></script>
+<script>
+
+const SCREEN_WIDTH = 640;
+const SCREEN_HEIGHT = 480;
+const TILE_WIDTH = 32;
+const TILE_HEIGHT = 32;
+
+class Camera {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.dx = x;
+        this.dy = y;
+        this.target = {x: 0, y: 0};
+        this.angle = 0;
+        this.timeout = 0;
+        this.fn = null;
+        this.moving = false;
+    }
+    
+    setTarget(target) {
+        this.target = target;
+        this.angle = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        this.timeout = 80;
+        this.moving = true;
+    }
+}
+
+var camera = new Camera(0, 0);
+
+function generateId() {
+    return Array.from(Array(16).keys()).map(function(a) {
+        return String.fromCharCode(Math.floor(Math.random() * 26) + 97);
+    }).join("");
+}
+
+function getDistance(p1, p2) {
+    var dx = p2.x - p1.x;
+    var dy = p2.y - p1.y;
+    return Math.floor(Math.sqrt(dx*dx + dy*dy));
+}
+
+function getRange(battle, px, py, r) {
+    var range = [];
+    for (var x=-r;x<=r;x++) {
+        for (var y=-r;y<=r;y++) {
+            if (Math.abs(x) + Math.abs(y) <= r) {
+                range.push({
+                    x: x + px,
+                    y: y + py
+                });
+            }
+        }
+    }
+    return range;
+}
+
+function getSpread(battle, px, py, action) {
+    var spread = [];
+    action.spread.forEach(function(s) {
+        spread.push({
+            x: s[0] + px,
+            y: s[1] + py
+        });
+    });
+    return spread;
+}
+
+function inRange(range, x, y) {
+    return range.some(function(r) {
+        return r.x === x && r.y === y;
+    });
+}
+
+var battle;
+var sprites = {
+    "player": {
+        "squad": 0x1F6A9
+    },
+    "cpu": {
+        "squad": 0x1F3F4
+    }
+};
+
+class Unit {
+    constructor(x, y, team, name, sprite) {
+        this.x = x;
+        this.y = y;
+        this.id = generateId();
+        this.team = team;
+        this.name = name;
+        this.sprite = String.fromCodePoint(sprite);
+        
+    }
+    
+    draw(ctx) {
+        ctx.fillStyle = "rgb(255,255,255)";
+        ctx.font = "24px Arial";
+        ctx.fillText(this.sprite, this.x * TILE_WIDTH, this.y * TILE_HEIGHT);
+    }
+}
+
+class Squad {
+    constructor(team) {
+        this.team = team;
+        this.id = generateId();
+        this.x = 0;
+        this.y = 0;
+        this.sprite = String.fromCodePoint(sprites[team]["squad"]);
+        this.units = [];
+        this.agl = Math.floor(Math.random() * 7) + 3;
+        this.range = 2;
+        this.AT = 0;
+        this.dragging = false;
+        this.dragTileX = this.x;
+        this.dragTileY = this.y;
+    }
+    
+    ready(menuItems) {
+        return new Menu(
+            new Rect(288, 224, 100, 200, "rgb(0,0,0,0.5)"),
+            24,
+            menuItems
+        );
+    }
+    
+    addUnit(unit) {
+        this.units.push(unit);
+    }
+
+    getActions() {
+        return [
+            new BattleAction_Attack(this)
+        ];
+    }
+
+    mouse_down(tileX, tileY) {
+        this.dragging = true;
+        this.dragTileX = this.x;
+        this.dragTileY = this.y;
+    }
+    
+    drag(tileX, tileY) {
+        if (this.dragging) {
+            this.dragTileX = tileX;
+            this.dragTileY = tileY;
+        }
+    }
+    
+    drop(moveTree, tileX, tileY) {
+        this.dragging = false;
+        
+        var moveNode = moveTree.getNode(tileX, tileY);
+        
+        if (!moveNode || moveNode.occupied) {
+            return false;
+        }
+        else {
+            this.x = tileX;
+            this.y = tileY;
+            return true;
+        }
+    }
+    
+    done() {
+        this.AT = 0;
+    }
+    
+    draw(ctx) {
+        var dx = this.x * TILE_WIDTH - camera.dx;
+        var dy = this.y * TILE_HEIGHT - camera.dy;
+    
+        ctx.fillStyle = "rgb(255,255,255)";
+        ctx.font = "24px Arial";
+        ctx.fillText(this.sprite, dx, dy);
+        
+        if (this.dragging) {
+            dx = this.dragTileX * TILE_WIDTH - camera.dx;
+            dy = this.dragTileY * TILE_HEIGHT - camera.dy;
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            ctx.fillText(this.sprite, dx, dy);
+        }
+    }
+}
+
+class Battalion {
+    constructor(team) {
+        this.team = team;
+        this.units = [];
+        this.squads = [];
+        
+        for (var i=0; i<4; i++) {
+            var squad = new Squad(team);
+            for (var j=0; j<4; j++) {
+                var unit = new Unit(0, j + 5, team, "jeremy", 0x1F601);
+                this.units.push(unit);
+                squad.addUnit(unit);
+            }
+            this.squads.push(squad);
+        }
+    }
+    
+    draw(ctx) {
+        this.squads.forEach(function(s) {
+            s.draw(ctx);
+        });
+    }
+}
+
+class Rect {
+    constructor(x, y, w, h, color) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.color = color;
+    }
+    
+    hit(mx, my) {
+        return mx >= this.x
+            && my >= this.y
+            && mx < this.x + this.w
+            && my < this.y + this.h;
+    }
+}
+
+class Background {
+    constructor(split, color1, color2) {
+        this.split = split;
+        this.color1 = color1;
+        this.color2 = color2;
+    }
+}
+
+class Skirmish {
+    constructor(units) {
+        this.background = new Background(120, "rgb(30,144,255)", "rgb(158,204,102)");
+        this.menus = [];
+        
+        var items = [];
+        var fontsize = 24;
+        items.push(new Button(0, fontsize * 0, "Fight", function() { console.log("fight"); }));
+        items.push(new Button(0, fontsize * 1, "Move", function() { console.log("Move"); }));
+        items.push(new Button(0, fontsize * 2, "Magic", function() { console.log("Magic"); }));
+        items.push(new Button(0, fontsize * 3, "Item", function() { console.log("Item"); }));
+        
+        this.menus.push(new Menu(0, 320, 200, 140, "rgba(0, 0, 128, 0.5)", fontsize, items));
+    }
+    
+    draw(ctx) {
+        ctx.fillStyle = this.background.color1;
+        ctx.fillRect(0, 0, 640, this.background.split);
+        ctx.fillStyle = this.background.color2;
+        ctx.fillRect(0, this.background.split, 640, 480 - this.background.split);
+    
+        this.units.forEach((unit) => {
+            unit.draw(ctx);
+        });
+        
+        this.menus.forEach((menu) => {
+            menu.draw(ctx);
+        });
+    }
+}
+
+class BattleState_Menu {
+    constructor() {
+        this.parent = null;
+        this.menu = null;
+    }
+
+    setMenu(menu) {
+        this.menu = menu;
+    }
+
+    loop() {
+
+    }
+
+    mouse_down(mx, my) {
+        this.menu.mouse_down(mx, my);
+    }
+
+    mouse_move(mx, my) {
+        this.menu.mouse_move(mx, my);
+    }
+
+    mouse_up(mx, my) { }
+
+    draw(ctx) {
+        this.menu.draw(ctx);
+    }
+}
+
+class BattleState_MoveCamera {
+    constructor(target, fn) {
+        this.fn = fn;
+        camera.setTarget(target);
+    }
+
+    loop() {
+        if (!camera.moving) {
+            return;
+        }
+        
+        var distance = getDistance(camera.target, camera);
+        var dx = Math.cos(camera.angle) * distance / 10;
+        var dy = Math.sin(camera.angle) * distance / 10;
+        
+        if (distance > 0 && camera.timeout > 0) {
+            camera.x = camera.x + dx;
+            camera.y = camera.y + dy;
+            camera.timeout--;
+        }
+        else {
+            camera.x = camera.target.x;
+            camera.y = camera.target.y;
+            this.done();
+        }
+        
+        camera.dx = Math.round(camera.x);
+        camera.dy = Math.round(camera.y);
+    }
+
+    mouse_move() { }
+    mouse_down() { }
+    mouse_up() { }
+
+    done() {
+        camera.moving = false;
+        this.fn();
+    }
+
+    draw(ctx) {
+
+    }
+}
+
+class BattleState_MoveSquad {
+    constructor(battle, squad, success, failure) {
+        this.squad = squad;
+        this.moveTree = new MoveTree(battle.map_width, battle.map_height, battle.getSquads(), squad);
+        this.path = null;
+        this.success = success;
+        this.failure = failure;
+    }
+    
+    loop() {
+    
+    }
+    
+    mouse_down(mx, my, squad) {
+        this.squad.mouse_down(tileX, tileY);
+        this.mouse_move(mx, my);
+    }
+    
+    mouse_up(mx, my) {
+        if (this.squad.dragging) {
+            if (this.squad.drop(this.moveTree, tileX, tileY)) {
+                this.success(this.path);
+            }
+            else {
+                this.failure();
+            }
+        }
+    }
+    
+    mouse_move(mx, my) {
+        this.squad.drag(tileX, tileY);
+        
+        if (this.squad.dragging) {
+            this.path = this.moveTree.getPath(tileX, tileY);
+        }
+    }
+    
+    draw(ctx) {
+        if (this.moveTree) {
+            ctx.fillStyle = "rgba(100, 100, 200, 0.5)";
+            this.moveTree.list.forEach(function(node) {
+                var dx = node.x * TILE_WIDTH - camera.dx;
+                var dy = node.y * TILE_HEIGHT - camera.dy;
+                ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+            });
+            
+            if (this.path) {
+                this.path.forEach(function(node) {
+                    var dx = node.x * TILE_WIDTH - camera.dx;
+                    var dy = node.y * TILE_HEIGHT - camera.dy;
+                    ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+                });
+            }
+        }
+    }
+}
+
+class BattleState_ActionRange {
+    constructor(battle, squad, success, failure) {
+        this.squad = squad;
+        this.range = getRange(battle, squad.x, squad.y, squad.range); //should come from action??
+        this.success = success;
+        this.failure = failure;
+    }
+    
+    loop() {
+    
+    }
+    
+    mouse_down(mx, my, squad) {
+        if (inRange(this.range, tileX, tileY)) {
+            this.success(this.range, tileX, tileY);
+        }
+        else {
+            this.failure();
+        }
+    }
+    
+    mouse_up(mx, my) {
+
+    }
+    
+    mouse_move(mx, my) {
+        
+    }
+    
+    draw(ctx) {
+        if (this.range) {
+            ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+            this.range.forEach(function(tile) {
+                var dx = tile.x * TILE_WIDTH - camera.dx;
+                var dy = tile.y * TILE_HEIGHT - camera.dy;
+                ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+            });
+        }
+
+        ctx.fillStyle = "rgba(255, 0, 0, 1.0)";
+        var dx = tileX * TILE_WIDTH - camera.dx;
+        var dy = tileY * TILE_HEIGHT - camera.dy;
+        ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+    }
+}
+
+class BattleState_ActionSpread {
+    constructor(battle, action, range, px, py, success, failure) {
+        this.range = range;
+        this.spread = getSpread(battle, px, py, action);
+        this.px = px;
+        this.py = py;
+        this.success = success;
+        this.failure = failure;
+    }
+
+    loop() {
+
+    }
+
+    mouse_down(mx, my, squad) {
+        if (tileX === this.px && tileY === this.py) {
+            this.success();
+        }
+        else {
+            this.failure();
+        }
+    }
+
+    mouse_up(mx, my) {
+
+    }
+
+    mouse_move(mx, my) {
+
+    }
+
+    draw(ctx) {
+        if (this.range) {
+            ctx.fillStyle = "rgba(255, 0, 0, 0.5";
+            this.range.forEach(function(tile) {
+                var dx = tile.x * TILE_WIDTH - camera.dx;
+                var dy = tile.y * TILE_HEIGHT - camera.dy;
+                ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+            });
+        }
+
+        if (this.spread) {
+            ctx.fillStyle = "rgba(0, 255, 0, 1.0)";
+            this.spread.forEach(function(tile) {
+                var dx = tile.x * TILE_WIDTH - camera.dx;
+                var dy = tile.y * TILE_HEIGHT - camera.dy;
+                ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+            });
+        }
+
+        ctx.fillStyle = "rgba(255, 0, 0, 1.0)";
+        var dx = tileX * TILE_WIDTH - camera.dx;
+        var dy = tileY * TILE_HEIGHT - camera.dy;
+        ctx.fillRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+    }
+}
+
+class BattleState_InvokeAction {
+    constructor(action, success) {
+        this.action = action;
+        this.success = success;
+    }
+
+    loop() {
+        this.action.invoke();
+        this.success(); //bring action/move/done menu back up
+    }
+
+    draw(ctx) {
+
+    }
+}
+
+class BattleState_WalkPath {
+    constructor(path, squad, callback) {
+        this.path = path;
+        this.squad = squad;
+        this.callback = callback;
+    }
+    
+    loop() {
+        if (this.path.length > 0) {
+            var node = this.path.shift();
+            this.squad.x = node.x;
+            this.squad.y = node.y;
+        }
+        else {
+            this.callback();
+        }
+    }
+    
+    mouse_down() { }
+    mouse_up() { }
+    mouse_move() { }
+    draw(ctx) { }
+}
+
+class Battle {
+    constructor(width, height, battalions) {
+        this.map_width = width;
+        this.map_height = height;
+        this.menu = null;
+        this.battalions = battalions;
+        this.squads = this.getSquads();
+        
+        //put each squad in random, unoccupied x,y location
+        this.battalions.forEach(function(b) {
+            b.squads.forEach(function(s) {
+                s.x = Math.floor(Math.random() * this.map_width);
+                s.y = Math.floor(Math.random() * this.map_height);
+            }, this);
+        }, this);
+        
+        this.state = null;
+        this.activeSquad = null;
+        //this.selectedSquad = null;
+    }
+    
+    setState(state) {
+        this.state = state;
+    }
+
+    setMenu(menu) {
+        this.menu = menu;
+    }
+    
+    move() {
+        this.state = new BattleState_MoveSquad(this, this.activeSquad, function(path) {
+            this.state = new BattleState_WalkPath(path, this.activeSquad, function() {
+                this.done();
+            }.bind(this));
+        }.bind(this),
+        function() {
+            console.log("failure");
+            this.state = null;
+            this.activeSquad = null;
+        }.bind(this));
+        this.menu = null;
+    }
+    
+    action(bsRootMenu, action) {
+        var battle = this;
+        
+        var bsMenu = new BattleState_Menu();
+        bsMenu.setMenu(new Menu(
+            new Rect(288, 256, 100, 200, "rgba(0,0,0,0.5)"),
+            24,
+            [
+                new MenuItem(
+                    "Confirm",
+                    function(menu) {
+                        battle.state = new BattleState_InvokeAction(action, function() {
+                            battle.done();
+                        })
+                    }
+                ),
+                new MenuItem(
+                    "Cancel",
+                    function(menu) {
+                        battle.state = bsRootMenu;
+                    }
+                )
+            ]
+        ));
+
+        battle.state = new BattleState_ActionRange(battle, battle.activeSquad, function(range, px, py) {
+            battle.state = new BattleState_ActionSpread(battle, action, range, px, py, function() {
+                battle.state = bsMenu;
+            }, function() {
+                console.log("spread failure");
+                battle.state = bsRootMenu;
+            });
+        }, function() {
+            console.log("range failure");
+            battle.state = bsRootMenu;
+        });
+        battle.menu = null;
+    }
+
+    done() {
+        this.activeSquad.done();
+        this.activeSquad = null;
+        this.menu = null;
+        this.state = null;
+    }
+    
+    getSquads() {
+        var squads = [];
+        this.battalions.forEach(function(b) {
+            squads = squads.concat(b.squads);
+        });
+        return squads;
+    }
+    
+    getNextActiveSquad() {
+        var nextActiveSquad;
+        var squads = this.getSquads();
+
+        while (true) {
+            squads.sort(function(a,b) {
+                return b.AT - a.AT;
+            });
+            
+            if (squads[0].AT >= 100) {
+                return squads[0];
+            }
+            
+            squads.forEach(function(s) {
+                s.AT += s.agl;
+            });
+        }
+    }
+    
+    getSquad(x, y) {
+        var squads = this.getSquads();
+        var squad = null;
+        squads.forEach(function(s) {
+            if (s.x == x && s.y == y) {
+                squad = s;
+            }
+        });
+        return squad;
+    }
+    
+    getBattleMap() {
+        var battle_map = [];
+        for (var x=0; x<this.map_width; x++) {
+            battle_map[x] = [];
+            for (var y=0; y<this.map_height; y++) {
+                battle_map[x][y] = null;
+            }
+        }
+        
+        var squads = this.getSquads();
+        
+        squads.forEach(function(s) {
+            battle_map[s.x][s.y] = s;
+        });
+        
+        return battle_map;
+    }
+    
+    loop() {
+        var battle = this;
+
+        if (battle.state) {
+            battle.state.loop();
+            return;
+        }
+    
+        if (!battle.activeSquad) {
+            battle.activeSquad = battle.getNextActiveSquad();
+            battle.setState(new BattleState_MoveCamera(
+                {
+                    x: battle.activeSquad.x * TILE_WIDTH - 256,
+                    y: battle.activeSquad.y * TILE_HEIGHT - 256
+                },
+                function() {
+                    var bsMenu = new BattleState_Menu();
+                    bsMenu.parent = null;
+                    bsMenu.menu = new Menu(
+                        new Rect(288, 256, 100, 200, "rgba(0,0,0,0.5)"),
+                        24,
+                        [
+                            new MenuItem(
+                                "Action",
+                                function(menu) {
+                                    var actions = battle.activeSquad.getActions();
+                                    var menuItems = [];
+                                    actions.forEach(function(action) {
+                                        menuItems.push(new MenuItem(
+                                            action.name,
+                                            function(menu) {
+                                                battle.action(bsMenu, action);
+                                            }
+                                        ))
+                                    });
+                                    menuItems.push(
+                                        new MenuItem(
+                                            "Back",
+                                            function(menu) {
+                                                bsMenu.setMenu(menu.parent);
+                                            }
+                                        )
+                                    );
+
+                                    bsMenu.setMenu(new SubMenu(
+                                        bsMenu.menu,
+                                        menuItems
+                                    ));
+                                }
+                            ),
+                            new MenuItem(
+                                "Move",
+                                function(menu) {
+                                    battle.move();
+                                }
+                            ),
+                            new MenuItem(
+                                "Done",
+                                function(menu) {
+                                    battle.done();
+                                }
+                            )
+                        ]
+                    );
+                    battle.setState(bsMenu);
+                }
+            ));
+        }
+    }
+    
+    mouse_down(mx, my) {
+        tileX = Math.floor((mx + camera.dx) / TILE_WIDTH);
+        tileY = Math.floor((my + camera.dy) / TILE_HEIGHT);
+        
+        if (this.state) {
+            this.state.mouse_down(mx, my);
+            return;
+        }
+        
+        if (this.menu) {
+            return this.menu.mouse_down(mx, my);
+        }
+    }
+    
+    mouse_up(mx, my) {
+        tileX = Math.floor((mx + camera.dx) / TILE_WIDTH);
+        tileY = Math.floor((my + camera.dy) / TILE_HEIGHT);
+    
+        if (this.state) {
+            this.state.mouse_up(mx, my);
+            return;
+        }
+    }
+    
+    mouse_move(mx, my) {
+        tileX = Math.floor((mx + camera.dx) / TILE_WIDTH);
+        tileY = Math.floor((my + camera.dy) / TILE_HEIGHT);
+        
+        if (this.state) {
+            this.state.mouse_move(mx, my);
+            return;
+        }
+        
+        if (this.menu) {
+            this.menu.mouse_move(mx, my);
+        }
+    }
+    
+    draw(ctx) {
+        ctx.fillStyle = "rgb(200,200,200)";
+        ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    
+        if (this.state) {
+            this.state.draw(ctx);
+        }
+    
+        if (this.activeSquad) {
+            var dx = this.activeSquad.x * TILE_WIDTH - camera.dx;
+            var dy = this.activeSquad.y * TILE_HEIGHT - camera.dy;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "rgba(0,155,0,0.5)";
+            ctx.strokeRect(dx, dy, TILE_WIDTH, TILE_HEIGHT);
+        }
+    
+        this.squads.forEach(function(s) {
+            s.draw(ctx);
+        });
+        
+        if (this.menu) {
+            this.menu.draw(ctx);
+        }
+    }
+}
+
+function loop() {
+
+    battle.loop();
+
+    draw();
+    
+    window.requestAnimationFrame(loop);
+}
+
+function draw() {
+    battle.draw(context);
+}
+
+function mouse_down(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+    button = e.button;
+
+    battle.mouse_down(mx, my, button);
+}
+
+function mouse_move(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+    
+    battle.mouse_move(mx, my);
+}
+
+function mouse_up(e) {
+    mx = e.offsetX;
+    my = e.offsetY;
+    button = e.button;
+    
+    battle.mouse_up(mx, my, button);
+}
+
+var canvas, context;
+var mx, my, tileX, tileY;
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+    context.textBaseline = "top";
+    
+    canvas.onmousedown = mouse_down;
+    canvas.onmousemove = mouse_move;
+    canvas.onmouseup = mouse_up;
+    
+    battle = new Battle(16, 16, [new Battalion("player"), new Battalion("cpu")]);
+    
+    loop();
+};
+
+</script>
+
+</head>
+
+<body>
+
+<canvas id="canvas" width="640" height="480"></canvas>
+
+</body>
+
+
+</html>

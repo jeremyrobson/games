@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+    <head>
+        <script src="utils.js"></script>
+        <script src="item.js"></script>
+        <script src="unit.js"></script>
+        <script src="https://code.jquery.com/jquery-3.2.1.min.js"></script>
+        <script>
+        
+        var team = {
+            "units": []
+        };
+        var inventory = [];
+
+        function refresh_inventory() {
+            var tbody = $("#inventory_table > tbody").empty();
+
+            inventory.forEach(function(item) {
+                var row = $("<tr></tr>")
+                .appendTo(tbody);
+
+                var cell = $("<td></td>")
+                .html(item.name)
+                .appendTo(row);
+
+                var cell = $("<td></td>")
+                .html(item.type)
+                .appendTo(row);
+
+                var cell = $("<td></td>")
+                .html(item.subtype)
+                .appendTo(row);
+            });
+        }
+
+        function refresh_equip(unit) {
+            var tbody = $("#equip_table > tbody").empty();
+
+            for (key in unit.equip) {
+                var item = unit.equip[key];
+
+                if (item) {
+
+                var row = $("<tr></tr>")
+                .appendTo(tbody);
+
+                var cell = $("<td></td>")
+                .html(item.name)
+                .appendTo(row);
+
+                var cell = $("<td></td>")
+                .html(item.type)
+                .appendTo(row);
+
+                var cell = $("<td></td>")
+                .html(item.subtype)
+                .appendTo(row);
+                }
+            };
+        }
+
+        function refresh() {
+            refresh_inventory();
+            refresh_equip(team.units[0]);
+        }
+
+        $(document).ready(function() {
+            for (var i=0; i<10; i++) {
+                inventory.push(random_item());
+            }
+
+            for (var i=0; i<5; i++) {
+                team.units.push(random_unit());
+            }
+
+            team.units[0].equip_item(random_item());
+
+            refresh();
+        });
+
+        </script>
+    </head>
+    <body>
+        <div>
+            <table id="inventory_table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Subtype</th>
+                        <th>Stuff</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <table id="equip_table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Subtype</th>
+                        <th>Stuff</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </body>
+</html>

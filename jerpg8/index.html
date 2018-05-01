@@ -1,0 +1,229 @@
+<!doctype html>
+<html>
+
+<head>
+
+<script>
+
+function randint(min, max) {
+    return Math.floor(Math.random() * (max - min)) + min;
+}
+
+var actiontemplates = {
+    "melee": {
+        "pwr": 3,
+        "spread": [[0,0]]
+    },
+    "fire": {
+        "pwr": 1,
+        "spread": [[-1,0],[0,-1],[0,0],[1,0],[0,1]]
+    },
+    "heal": {
+        "pwr": -2,
+        "spread": [[0,0]]
+    }
+};
+
+class Unit {
+    constructor(team) {
+        this.team = team;
+        this.name = team + randint(0, 10000000);
+        this.x = randint(0,4);
+        this.y = randint(0,4);
+        this.hp = randint(30, 100);
+        this.agl = Math.random();
+        this.CT = 0;
+    }
+}
+
+class Battle {
+    constructor(units) {
+        this.units = units;
+        this.units.push(
+            new Unit("cpu"),
+            new Unit("cpu"),
+            new Unit("cpu"),
+            new Unit("cpu"),
+            new Unit("cpu")
+        );
+
+        this.tiles = [];
+
+        for (var x=0; x<4; x++) {
+            this.tiles[x] = [];
+            for (var y=0; y<4; y++) {
+                this.tiles[x][y] = {};
+            }
+        }
+
+        this.units.forEach(function(unit) {
+            this.tiles[unit.x][unit.y][unit.team] = unit;
+        }, this);
+    }
+
+    loop() {
+        switch (state) {
+            case "nextturn":
+                this.units.sort(function(a, b) {
+                    return b.CT - a.CT;
+                });
+                if (this.units[0].CT >= 100) {
+                    activeUnit = this.units[0];
+                    state = "activeunit";
+                }
+                else {
+                    this.units.forEach(function(unit) {
+                        unit.CT += unit.agl;
+                    });
+                    this.units.sort(function(a, b) {
+                        return b.CT - a.CT;
+                    });
+                    if (this.units[0].CT >= 100) {
+                        activeUnit = this.units[0];
+                        state = "activeunit";
+                    }
+                }
+                break;
+            case "activeunit":
+                var action = this.getBestAction(activeUnit)
+                action.fn(action)
+                break;
+        }
+
+        var s = "";
+        this.units.forEach(function(unit, i) {
+            s += i + ". " + unit.name + " - hp: " + unit.hp + " - CT: " + parseInt(unit.CT) + "<br>";
+        });
+        output.innerHTML = s;
+    }
+
+    getTargetList(key, x, y, map) {
+        var targetList = [];
+
+        actiontemplates[key]["spread"].forEach(function(s) {
+            var sx = x + s[0];
+            var sy = y + s[1];
+            if (this.tiles[sx] && this.tiles[sx][sy] && this.tiles[sx][sy][map]) {
+                targetList.push(this.tiles[sx][sy][map]);
+            }
+        }, this);
+
+        return targetList;
+    }
+
+    getBestAction(activeUnit) {
+        var actionList = [];
+
+        for (var x=0; x<4; x++) {
+            for (var y=0; y<4; y++) {
+                ["player", "cpu"].forEach(function(map) {
+                    for (var key in actiontemplates) {
+                        var damage = 0, score = 0;
+                        var targetList = this.getTargetList(key, x, y, map);
+
+                        if (targetList.length > 0) {
+                            targetList.forEach(function(unit) {
+                                damage += getDamage(key, activeUnit, unit);
+                                score += activeUnit.team !== unit.team ? damage : -damage;
+                            });
+
+                            var action = {
+                                "actiontemplate": key,
+                                "actor": activeUnit,
+                                "targetList": targetList,
+                                "map": map,
+                                "x": x,
+                                "y": y,
+                                "score": score,
+                                "fn": function() {
+                                    this.targetList.forEach(function(unit) {
+                                        var damage = getDamage(this.actiontemplate, this.actor, unit);
+                                        unit.hp = unit.hp - damage;
+                                        //console.log(this.actor.name + " attacks " + unit.name + " for " + damage + " damages.");
+                                    }, this);
+                                    
+                                    this.actor.CT = 0;
+                                    state = "nextturn";
+                                }
+                            };
+
+                            actionList.push(action);
+                        }
+                    }
+                }, this);
+            }
+        }
+
+        actionList.sort(function(a, b) {
+            return b.score - a.score;
+        });
+
+        console.log(actionList);
+
+        return actionList[0];
+    }
+}
+
+function getDamage(key, actor, target) {
+    var damage = 0;
+    var roll = randint(1, 7) + randint(1, 7);
+    var power = actiontemplates[key]["pwr"];
+
+    damage = roll * power;
+
+    return damage;
+}
+
+var canvas, context;
+var battle;
+var state = "nextturn";
+var activeUnit;
+var output;
+var paused = false;
+
+function loop() {
+
+    if (!paused) {
+        battle.loop();
+    }
+
+    window.requestAnimationFrame(loop);
+}
+
+function pause() {
+    paused = true;
+}
+
+window.onload = function() {
+    output = document.getElementById("output");
+
+    canvas = document.getElementById("canvas");
+    context = canvas.getContext("2d");
+
+    var team = {
+        "units": []
+    };
+
+    team.units.push(
+        new Unit("player"),
+        new Unit("player"),
+        new Unit("player"),
+        new Unit("player"),
+        new Unit("player")
+    );
+
+    battle = new Battle(team.units);
+
+    window.requestAnimationFrame(loop);
+}
+
+</script>
+
+</head>
+
+<body>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <div id="output" style="display: inline-block;"></div>
+</body>
+
+</html>

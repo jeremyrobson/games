@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+
+<head>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+    }
+</style>
+
+<script>
+    const XOFFSET = 256;
+</script>
+
+<script src="unit.js"></script>
+<script src="party.js"></script>
+<script src="battle.js"></script>
+<script>
+
+var canvas, context;
+var state;
+var party = {};
+var paused = false;
+
+function loop() {
+
+    state.loop();
+    draw();
+
+    if (!paused) {
+        window.requestAnimationFrame(loop);
+    }
+}
+
+function mouse_down(e) {
+    var mx = e.offsetX;
+    var my = e.offsetY;
+    state.mouse_down(mx, my);
+}
+
+function draw() {
+    context.fillStyle = "rgb(0,0,0)";
+    context.fillRect(0, 0, 640, 480);
+
+    state.draw(context);
+}
+
+function pause() {
+    paused = true;
+}
+
+window.onload = function() {
+    canvas = document.getElementById("canvas");
+    canvas.onmousedown = mouse_down;
+    context = canvas.getContext("2d");
+
+    party = new Party("player", "x");
+    state = new Battle(party);
+
+    window.requestAnimationFrame(loop);
+};
+
+</script>
+
+</head>
+
+<body>
+    <canvas id="canvas" width="640" height="480"></canvas>
+</body>
+
+</html>

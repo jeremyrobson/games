@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+
+<head>
+    <script src="hockey.js"></script>
+    <script>
+    
+    var season;
+
+    window.onload = function() {
+        season = new Season(31, 82);
+        /*
+        season.games.forEach(function(game) {
+            document.write(game.toString() + "<br>");
+        });
+        */
+
+        season.teams.forEach(function(team) {
+            document.write(team.toString() + "<br>");
+        });
+    };
+
+    </script>
+</head>
+
+<body>
+
+</body>
+
+</html>
